@@ -1,0 +1,1 @@
+/usr/bin/clang++ -g -Xlinker --dependency-file=CMakeFiles/test_run.dir/link.d CMakeFiles/test_run.dir/test_run.cpp.o -o test_run  ../libsome_lib.a /usr/lib64/libpq.so

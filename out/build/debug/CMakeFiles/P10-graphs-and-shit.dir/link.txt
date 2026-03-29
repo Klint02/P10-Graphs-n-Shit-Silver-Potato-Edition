@@ -1,0 +1,1 @@
+/usr/bin/clang++ -g -Xlinker --dependency-file=CMakeFiles/P10-graphs-and-shit.dir/link.d "CMakeFiles/P10-graphs-and-shit.dir/app/main.cpp.o" -o P10-graphs-and-shit  libsome_lib.a /usr/lib64/libpq.so

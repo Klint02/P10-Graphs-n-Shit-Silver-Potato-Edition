@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsome_lib.a CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o
+/usr/bin/ranlib libsome_lib.a
