@@ -25,6 +25,7 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/bits/basic_string.tcc \
   /usr/include/c++/15/bits/char_traits.h \
   /usr/include/c++/15/bits/charconv.h \
+  /usr/include/c++/15/bits/codecvt.h \
   /usr/include/c++/15/bits/concept_check.h \
   /usr/include/c++/15/bits/cpp_type_traits.h \
   /usr/include/c++/15/bits/cxxabi_forced.h \
@@ -32,6 +33,7 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/bits/exception.h \
   /usr/include/c++/15/bits/exception_defines.h \
   /usr/include/c++/15/bits/exception_ptr.h \
+  /usr/include/c++/15/bits/fstream.tcc \
   /usr/include/c++/15/bits/functexcept.h \
   /usr/include/c++/15/bits/functional_hash.h \
   /usr/include/c++/15/bits/hash_bytes.h \
@@ -40,8 +42,11 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/bits/istream.tcc \
   /usr/include/c++/15/bits/locale_classes.h \
   /usr/include/c++/15/bits/locale_classes.tcc \
+  /usr/include/c++/15/bits/locale_conv.h \
   /usr/include/c++/15/bits/locale_facets.h \
   /usr/include/c++/15/bits/locale_facets.tcc \
+  /usr/include/c++/15/bits/locale_facets_nonio.h \
+  /usr/include/c++/15/bits/locale_facets_nonio.tcc \
   /usr/include/c++/15/bits/localefwd.h \
   /usr/include/c++/15/bits/memory_resource.h \
   /usr/include/c++/15/bits/memoryfwd.h \
@@ -54,9 +59,11 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/bits/postypes.h \
   /usr/include/c++/15/bits/predefined_ops.h \
   /usr/include/c++/15/bits/ptr_traits.h \
+  /usr/include/c++/15/bits/quoted_string.h \
   /usr/include/c++/15/bits/range_access.h \
   /usr/include/c++/15/bits/refwrap.h \
   /usr/include/c++/15/bits/requires_hosted.h \
+  /usr/include/c++/15/bits/sstream.tcc \
   /usr/include/c++/15/bits/std_abs.h \
   /usr/include/c++/15/bits/stl_algobase.h \
   /usr/include/c++/15/bits/stl_bvector.h \
@@ -84,6 +91,7 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/cstddef \
   /usr/include/c++/15/cstdio \
   /usr/include/c++/15/cstdlib \
+  /usr/include/c++/15/ctime \
   /usr/include/c++/15/cwchar \
   /usr/include/c++/15/cwctype \
   /usr/include/c++/15/debug/assertions.h \
@@ -94,14 +102,18 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/ext/numeric_traits.h \
   /usr/include/c++/15/ext/string_conversions.h \
   /usr/include/c++/15/ext/type_traits.h \
+  /usr/include/c++/15/fstream \
   /usr/include/c++/15/initializer_list \
+  /usr/include/c++/15/iomanip \
   /usr/include/c++/15/ios \
   /usr/include/c++/15/iosfwd \
   /usr/include/c++/15/iostream \
   /usr/include/c++/15/istream \
+  /usr/include/c++/15/locale \
   /usr/include/c++/15/new \
   /usr/include/c++/15/ostream \
   /usr/include/c++/15/pstl/pstl_config.h \
+  /usr/include/c++/15/sstream \
   /usr/include/c++/15/stdexcept \
   /usr/include/c++/15/streambuf \
   /usr/include/c++/15/string \
@@ -112,8 +124,10 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/typeinfo \
   /usr/include/c++/15/vector \
   /usr/include/c++/15/x86_64-redhat-linux/bits/atomic_word.h \
+  /usr/include/c++/15/x86_64-redhat-linux/bits/basic_file.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/c++allocator.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/c++config.h \
+  /usr/include/c++/15/x86_64-redhat-linux/bits/c++io.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/c++locale.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/cpu_defines.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/ctype_base.h \
@@ -121,7 +135,9 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/c++/15/x86_64-redhat-linux/bits/error_constants.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/gthr-default.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/gthr.h \
+  /usr/include/c++/15/x86_64-redhat-linux/bits/messages_members.h \
   /usr/include/c++/15/x86_64-redhat-linux/bits/os_defines.h \
+  /usr/include/c++/15/x86_64-redhat-linux/bits/time_members.h \
   /usr/include/alloca.h \
   /usr/include/asm-generic/bitsperlong.h \
   /usr/include/asm-generic/errno-base.h \
@@ -202,6 +218,7 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
   /usr/include/features.h \
   /usr/include/gnu/stubs-64.h \
   /usr/include/gnu/stubs.h \
+  /usr/include/libintl.h \
   /usr/include/libpq-fe.h \
   /usr/include/linux/errno.h \
   /usr/include/linux/posix_types.h \
@@ -245,6 +262,8 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/linux/posix_types.h:
 
+/usr/include/libintl.h:
+
 /usr/include/features-time64.h:
 
 /usr/include/errno.h:
@@ -264,8 +283,6 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 /usr/include/bits/types/struct___jmp_buf_tag.h:
 
 /usr/include/bits/types/struct_FILE.h:
-
-/usr/include/bits/types/sigset_t.h:
 
 /usr/include/bits/types/error_t.h:
 
@@ -323,21 +340,39 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/asm/errno.h:
 
-/usr/include/c++/15/bits/basic_ios.tcc:
+/usr/include/stdc-predef.h:
 
-/usr/include/c++/15/x86_64-redhat-linux/bits/c++config.h:
+/usr/include/asm-generic/posix_types.h:
 
-/usr/include/bits/select.h:
+/usr/include/asm-generic/errno.h:
 
-/usr/include/c++/15/debug/assertions.h:
+/usr/include/asm-generic/types.h:
 
-/usr/include/c++/15/bits/std_abs.h:
-
-/usr/include/c++/15/typeinfo:
+/usr/include/asm-generic/errno-base.h:
 
 /usr/include/bits/wchar.h:
 
 /usr/include/asm-generic/bitsperlong.h:
+
+/usr/include/alloca.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/time_members.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/messages_members.h:
+
+/usr/include/bits/floatn-common.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/error_constants.h:
+
+/usr/include/bits/types/__mbstate_t.h:
+
+/usr/include/bits/time.h:
+
+/usr/include/bits/stdio_lim.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/ctype_inline.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/c++locale.h:
 
 /usr/include/wctype.h:
 
@@ -349,7 +384,15 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/ostream.tcc:
 
+/usr/include/asm-generic/int-ll64.h:
+
+/usr/include/c++/15/bits/memoryfwd.h:
+
 /usr/include/c++/15/bits/stringfwd.h:
+
+/usr/include/c++/15/bits/cxxabi_forced.h:
+
+/usr/include/c++/15/tuple:
 
 /usr/include/c++/15/bits/postypes.h:
 
@@ -369,10 +412,6 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/hash_bytes.h:
 
-/usr/include/locale.h:
-
-/usr/lib/clang/21/include/__stddef_ptrdiff_t.h:
-
 /usr/include/c++/15/bits/nested_exception.h:
 
 /usr/include/c++/15/bits/vector.tcc:
@@ -380,6 +419,16 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 /usr/include/bits/uintn-identity.h:
 
 /usr/lib/clang/21/include/__stddef_wchar_t.h:
+
+/usr/include/c++/15/bits/fstream.tcc:
+
+/usr/include/linux/errno.h:
+
+/usr/include/c++/15/bits/invoke.h:
+
+/usr/include/c++/15/bits/locale_facets_nonio.tcc:
+
+/usr/lib/clang/21/include/__stdarg___gnuc_va_list.h:
 
 /usr/include/c++/15/bits/ptr_traits.h:
 
@@ -391,9 +440,11 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/debug/debug.h:
 
-/usr/include/c++/15/bits/ostream.h:
-
 /usr/include/c++/15/bits/basic_string.tcc:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/os_defines.h:
+
+/usr/include/c++/15/ext/string_conversions.h:
 
 /usr/include/c++/15/bits/istream.tcc:
 
@@ -402,6 +453,10 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 /usr/include/c++/15/backward/binders.h:
 
 /usr/include/c++/15/bits/uses_allocator_args.h:
+
+/usr/include/locale.h:
+
+/usr/lib/clang/21/include/__stddef_ptrdiff_t.h:
 
 /usr/include/stdint.h:
 
@@ -417,10 +472,6 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/version.h:
 
-/usr/include/linux/errno.h:
-
-/usr/include/c++/15/bits/invoke.h:
-
 /usr/lib/clang/21/include/__stddef_offsetof.h:
 
 /usr/include/bits/stdint-least.h:
@@ -430,8 +481,6 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 /usr/include/bits/atomic_wide_counter.h:
 
 /usr/lib/clang/21/include/__stddef_max_align_t.h:
-
-/usr/include/c++/15/ostream:
 
 /usr/lib/clang/21/include/stdint.h:
 
@@ -451,9 +500,17 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bit:
 
+/usr/include/sys/cdefs.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/cpu_defines.h:
+
+/usr/lib/clang/21/include/__stddef_nullptr_t.h:
+
 /usr/include/ctype.h:
 
 /usr/include/bits/waitflags.h:
+
+/usr/include/c++/15/bits/locale_conv.h:
 
 /usr/include/c++/15/bits/locale_facets.tcc:
 
@@ -469,25 +526,29 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/functexcept.h:
 
-/usr/lib/clang/21/include/__stdarg___gnuc_va_list.h:
-
 /usr/lib/clang/21/include/__stddef_header_macro.h:
 
-/usr/include/c++/15/bits/range_access.h:
-
 /usr/lib/clang/21/include/__stddef_size_t.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/ctype_base.h:
+
+/usr/include/c++/15/bits/cpp_type_traits.h:
+
+/usr/include/c++/15/streambuf:
+
+/usr/include/c++/15/bits/basic_string.h:
 
 /usr/include/bits/types/struct_sched_param.h:
 
 /usr/include/c++/15/bits/cxxabi_init_exception.h:
 
+/usr/include/c++/15/bits/ostream.h:
+
+/usr/include/c++/15/fstream:
+
 /usr/include/bits/pthread_stack_min-dynamic.h:
 
 /usr/include/c++/15/iostream:
-
-/usr/include/c++/15/bits/cxxabi_forced.h:
-
-/usr/include/c++/15/tuple:
 
 /usr/include/bits/setjmp.h:
 
@@ -509,9 +570,9 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/stl_iterator_base_types.h:
 
-/usr/include/stdc-predef.h:
+/usr/include/c++/15/bits/basic_ios.tcc:
 
-/usr/include/asm-generic/posix_types.h:
+/usr/include/c++/15/x86_64-redhat-linux/bits/c++config.h:
 
 /home/rasmusbertelsennoerfjand/Documents/GitHub/P10-Graphs-n-Shit-Silver-Potato-Edition/src/DBfunctions.hpp:
 
@@ -519,9 +580,21 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/bits/charconv.h:
 
-/usr/include/c++/15/bits/stl_construct.h:
+/usr/include/c++/15/bits/range_access.h:
 
-/usr/include/alloca.h:
+/usr/include/c++/15/bits/sstream.tcc:
+
+/usr/include/bits/select.h:
+
+/usr/include/c++/15/debug/assertions.h:
+
+/usr/include/c++/15/bits/std_abs.h:
+
+/usr/include/c++/15/typeinfo:
+
+/usr/include/c++/15/ostream:
+
+/usr/include/c++/15/bits/stl_construct.h:
 
 /usr/include/bits/types/__FILE.h:
 
@@ -565,21 +638,31 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/concepts:
 
+/usr/include/c++/15/bits/codecvt.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/c++io.h:
+
 /usr/include/c++/15/cstdio:
 
-/usr/include/c++/15/bits/requires_hosted.h:
-
 /usr/include/c++/15/bits/locale_facets.h:
+
+/usr/include/c++/15/bits/requires_hosted.h:
 
 /usr/include/c++/15/cstdlib:
 
 /usr/include/c++/15/bits/functional_hash.h:
 
+/usr/include/c++/15/iomanip:
+
 /usr/include/c++/15/ext/type_traits.h:
+
+/usr/include/c++/15/ctime:
 
 /usr/include/c++/15/bits/stl_function.h:
 
 /usr/include/c++/15/cwchar:
+
+/usr/include/c++/15/bits/locale_facets_nonio.h:
 
 /usr/include/c++/15/exception:
 
@@ -591,21 +674,25 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/ext/atomicity.h:
 
+/usr/include/c++/15/bits/quoted_string.h:
+
 /usr/include/c++/15/ext/numeric_traits.h:
+
+/usr/include/bits/types/sigset_t.h:
+
+/usr/include/c++/15/sstream:
 
 /usr/include/c++/15/bits/exception.h:
 
 /usr/include/c++/15/initializer_list:
 
-/usr/include/c++/15/bits/memoryfwd.h:
-
-/usr/include/asm-generic/int-ll64.h:
-
 /usr/include/c++/15/ios:
 
-/usr/include/c++/15/x86_64-redhat-linux/bits/c++locale.h:
-
 /usr/include/c++/15/iosfwd:
+
+/usr/include/c++/15/locale:
+
+/usr/include/c++/15/string_view:
 
 /usr/include/c++/15/new:
 
@@ -613,58 +700,22 @@ CMakeFiles/some_lib.dir/src/DBfunctions.cpp.o: /home/rasmusbertelsennoerfjand/Do
 
 /usr/include/c++/15/stdexcept:
 
-/usr/include/c++/15/string_view:
-
 /usr/include/c++/15/bits/stl_bvector.h:
 
 /usr/include/c++/15/bits/stl_iterator.h:
 
 /usr/include/c++/15/vector:
 
-/usr/include/c++/15/x86_64-redhat-linux/bits/c++allocator.h:
-
-/usr/include/bits/floatn-common.h:
-
-/usr/include/c++/15/x86_64-redhat-linux/bits/error_constants.h:
-
-/usr/include/sys/cdefs.h:
-
-/usr/lib/clang/21/include/__stddef_nullptr_t.h:
-
-/usr/include/c++/15/x86_64-redhat-linux/bits/cpu_defines.h:
-
-/usr/include/c++/15/bits/cpp_type_traits.h:
-
-/usr/include/c++/15/streambuf:
-
-/usr/include/c++/15/bits/basic_string.h:
-
-/usr/include/c++/15/x86_64-redhat-linux/bits/ctype_base.h:
-
-/usr/include/bits/types/__mbstate_t.h:
-
-/usr/include/bits/time.h:
-
-/usr/include/bits/stdio_lim.h:
-
-/usr/include/c++/15/x86_64-redhat-linux/bits/ctype_inline.h:
-
 /usr/include/libpq-fe.h:
 
 /usr/include/bits/floatn.h:
+
+/usr/include/c++/15/x86_64-redhat-linux/bits/gthr.h:
 
 /usr/include/c++/15/type_traits:
 
 /usr/include/c++/15/bits/refwrap.h:
 
-/usr/include/c++/15/x86_64-redhat-linux/bits/gthr.h:
+/usr/include/c++/15/x86_64-redhat-linux/bits/basic_file.h:
 
-/usr/include/c++/15/ext/string_conversions.h:
-
-/usr/include/c++/15/x86_64-redhat-linux/bits/os_defines.h:
-
-/usr/include/asm-generic/types.h:
-
-/usr/include/asm-generic/errno-base.h:
-
-/usr/include/asm-generic/errno.h:
+/usr/include/c++/15/x86_64-redhat-linux/bits/c++allocator.h:

@@ -20,19 +20,17 @@ int main() {
     const char* query = "select * from cypher('demo_graph',$$ match(n:Person)-[r]->(m:Person) return n.name,type(r),m.name $$) as (n agtype, r agtype, m agtype);";
 
     //returnResult is from the library in src/DBfunctions.cpp
-    std::vector<std::vector<std::string>> test = returnResult(conn,query);
+    //std::vector<std::vector<std::string>> test = returnResult(conn,query);
 
-    //for print/debug
-    for(auto item : test){
-        for(auto val:item){
-            std::cout << val;
-        }
-        std::cout << std::endl;
-    }
+    //inserts all segments as nodes into apache age.
+    insert_segments_as_nodes(conn,extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv"));
 
-    //PQclear(res);
+    add_edges(conn);
+    
+    std::vector<std::vector<std::string>> testForPrint =extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
+    //debug_print(testForPrint);
 
-    //Closes connection to DB.
+    //Closes connection to DB
     PQfinish(conn);
     return 0;
 }
