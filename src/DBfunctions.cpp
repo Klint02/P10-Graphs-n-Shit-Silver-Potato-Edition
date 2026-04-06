@@ -1,5 +1,7 @@
 #include "DBfunctions.hpp"
-
+#include <unordered_map>
+#include <set>
+#include <sstream>
 //function that returns data based on the query it gets.
 std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* query){
     
@@ -11,7 +13,6 @@ std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* que
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         std::cerr << "Query failed: " << PQerrorMessage(conn) << std::endl;
         PQclear(res);
-        PQfinish(conn);
         return result;
     }
 
@@ -35,6 +36,7 @@ std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* que
 
 //Extracts the data from csv file and returns the result as a matrix[rows X cols] of type strings.
 std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& filepath){
+    auto start_timer{std::chrono::steady_clock::now()};
 
     //var declaration.
     std::vector<std::vector<std::string>> result;
@@ -53,22 +55,37 @@ std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& f
 
     //goes though the first 10 lines for simplicity 
     //TODO(RBN): Make it go through all lines.
-    for(int i = 0; i < 10; i++)
+    //for(int i = 0; i < 10; i++)
+    while(std::getline(file,line)) //FOR WHILE-LOOP
     {
-        std::getline(file,line);
+        //std::getline(file,line); USE FOR FOR-LOOP
         std::vector<std::string> row;
         std::stringstream ss(line);
         std::string cell;
-        for (int j = 0; j < 3; j++)
-        {
-            std::getline(ss,cell,',');
-            row.push_back(cell);
+
+        //loops through the cells in the current row.
+        int j=0;
+        while(std::getline(ss,cell,','))
+        {   
+            //checks if the current cell is data we want to extract.
+            //segmentkey=0, startpoint=1, endpoint=2, category=5, direction=6, streetname= 14;
+            if(j==0 ||j==1 ||j==2 ||j==5 ||j==6 ||j==14){
+                row.push_back(cell);
+            }
+            j++;
         }
+        ss.str(""); ss.clear(); 
         result.push_back(row);
     }
 
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "Extract_Data_From_CSV() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    
     //closes file and returns result as a matrix of strings
     file.close();
+    result.shrink_to_fit();
     return result;
 }
 
@@ -97,54 +114,109 @@ void debug_print(std::vector<std::vector<std::string>>& table){
 
 //takes data extracted from csv and insert into apache age.
 bool insert_segments_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data){
-    
+    auto start_timer{std::chrono::steady_clock::now()};
+    const size_t BATCH_SIZE = 1000;
     //var declarations
     std::string start = "select * from cypher('dummy_graph',$$ unwind [";
 
     std::string end = "] as row MERGE (s:Segment {id: row.id}) "
                       "SET s.start_point = row.start_point, "
-                      "s.end_point = row.end_point $$) as (n agtype);";
-    std::string middle;
+                      "s.end_point = row.end_point, s.category = row.category, s.direction = row.direction, s.name = row.name $$) as (n agtype);";
 
     //takes the extracted CSV data and makes a node for every row in the matrix.
-    for(const auto& row:data){
-        middle+= "{id:" + row[0] + ", start_point: " + row[1] + ", end_point: " +row[2]+"},";
-    }
 
-    //pops the last ',' the loop above makes. 
-    if (!middle.empty()) middle.pop_back();
-
-    //concatenates the 3 strings and cast it to c_str() for the query.
-    std::string queryFusion = start + middle + end;
-    const char* query = queryFusion.c_str();
-
-    //executes query and checks is it goes though. if not, throws error and retuen false.
-    PGresult* res= PQexec(conn, query);    
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        std::cerr << "insert_segements_as_nodes() failed: " << PQerrorMessage(conn) << std::endl;
+    for(size_t i = 0; i<data.size(); i+=BATCH_SIZE){
+        std::string middle="";
+        for (size_t j = i; j < i+BATCH_SIZE && j<data.size(); ++j)
+        {
+            middle += "{id:" + data[j][0] + ", start_point: " + data[j][1] + ", end_point: " + data[j][2] + ", category: " + data[j][3] + ", direction: " + data[j][4] + ", name: " + data[j][5]+  "},";      
+        }
+        if (!middle.empty()) middle.pop_back();
+        std::string query = start + middle + end;
+        PGresult* res= PQexec(conn, query.c_str());    
+        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+            std::cerr << "insert_segements_as_nodes() failed: " << PQerrorMessage(conn) << std::endl;
+            PQclear(res);
+            return false;
+        }
         PQclear(res);
-        PQfinish(conn);
-        return false;
+
     }
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "insert_segments_as_nodes() took: " << time_elapsed.count() <<" seconds" << std::endl;
+
     
-   
+    
     return true;
 }
 
 //adds edges between nodes where either start_point or end_point overlaps. Does not take direction into consideration.
 //TODO(RBN): make Check for directions.
-bool add_edges(PGconn* conn){
+bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
+
+    auto start_timer{std::chrono::steady_clock::now()};
+
+    std::string start = "SELECT * FROM cypher('dummy_graph',$$UNWIND [ ";
+    std::string end =   "] AS pair "
+                        "MATCH (a:Segment {id: pair[0]}), (b:Segment {id: pair[1]}) "
+                        "MERGE (a)-[:CONNECTED_TO]->(b) "
+                        "$$) AS (e agtype);";
+    
+        std::vector<std::pair<std::string,std::string>> edges;
+        std::unordered_map<std::string,std::vector<std::string>> point_map;
+
+        // Build map: point -> segment IDs
+        for (const auto& segment : data) {
+            point_map[segment[1]].push_back(segment[0]);
+            point_map[segment[2]].push_back(segment[0]);
+        }
+
+        // Build edges
+        for (const auto& segment : data) {
+            const std::string& seg_id   = segment[0];
+            const std::string& seg_start = segment[1];
+            const std::string& seg_end   = segment[2];
+
+            auto add_edges = [&](const std::string& point) {
+                for (const auto& other_id : point_map[point]) {
+                    if (seg_id != other_id) {
+                        edges.push_back({seg_id, other_id});
+                    }
+                }
+            };
+
+            add_edges(seg_start);
+            add_edges(seg_end);
+        }
+
+        // Build query string
+        std::ostringstream middle;
+        for (const auto& [a, b] : edges) {
+            middle << "[" << a << "," << b << "],";
+        }
+        std::string middle_str = middle.str();
+        if (!middle_str.empty()) middle_str.pop_back();
 
     //var declarations
-    const char* query = "select * from cypher('dummy_graph',$$ match (n:Segment),(m:Segment) where n.id <> m.id  AND  (n.start_point = m.start_point or n.start_point = m.end_point or n.end_point = m.start_point or n.end_point = m.end_point) MERGE (n)-[e:CONNECTED_TO]->(m) RETURN e $$) as (e agtype);";
+    std::string fill_query = start + middle_str + end; 
     
+
     //Executes query and stores result.
-    PGresult* res = PQexec(conn,query);
+    PGresult* res = PQexec(conn,fill_query.c_str());
     if(PQresultStatus(res) != PGRES_TUPLES_OK){
         std::cerr << "add_edges() Failed to execute" <<PQerrorMessage(conn)<< std::endl;
         PQclear(res);
         return false; 
-    } 
+    }
+
+    PQclear(res);
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed.count() <<" seconds" << std::endl;
 
 
     return true;

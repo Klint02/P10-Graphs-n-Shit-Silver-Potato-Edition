@@ -16,18 +16,20 @@ int main() {
     //Declares search path for apache age
     PGresult* res = PQexec(conn,"set search_path = ag_catalog, \"$user\", public;");   
 
+    std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
+
     //query used to test if it is possible to return data from apache age.
-    const char* query = "select * from cypher('demo_graph',$$ match(n:Person)-[r]->(m:Person) return n.name,type(r),m.name $$) as (n agtype, r agtype, m agtype);";
+    //const char* query = "select * from cypher('demo_graph',$$ match(n:Person)-[r]->(m:Person) return n.name,type(r),m.name $$) as (n agtype, r agtype, m agtype);";
 
     //returnResult is from the library in src/DBfunctions.cpp
     //std::vector<std::vector<std::string>> test = returnResult(conn,query);
 
     //inserts all segments as nodes into apache age.
-    insert_segments_as_nodes(conn,extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv"));
-
-    add_edges(conn);
+    insert_segments_as_nodes(conn,data);
     
-    std::vector<std::vector<std::string>> testForPrint =extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
+    add_edges(conn, data);
+    
+    //std::vector<std::vector<std::string>> testForPrint =extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
     //debug_print(testForPrint);
 
     //Closes connection to DB
