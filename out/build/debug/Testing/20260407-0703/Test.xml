@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="Linux-g++"
+	BuildStamp="20260407-0703-Experimental"
+	Name="rasmus-pc"
+	Generator="ctest-3.31.11"
+	CompilerName="/usr/bin/g++"
+	CompilerVersion="15.2.1"
+	OSName="Linux"
+	Hostname="rasmus-pc"
+	OSRelease="6.19.10-200.fc43.x86_64"
+	OSVersion="#1 SMP PREEMPT_DYNAMIC Wed Mar 25 16:09:19 UTC 2026"
+	OSPlatform="x86_64"
+	Is64Bits="1"
+	VendorString="AuthenticAMD"
+	VendorID="Advanced Micro Devices"
+	FamilyID="25"
+	ModelID="80"
+	ModelName="AMD Ryzen 7 5800H with Radeon Graphics"
+	ProcessorCacheSize="512"
+	NumberOfLogicalCPU="16"
+	NumberOfPhysicalCPU="8"
+	TotalVirtualMemory="8191"
+	TotalPhysicalMemory="15374"
+	LogicalProcessorsPerPhysical="2"
+	ProcessorClockFrequency="1397.39"
+	>
+	<Testing>
+		<StartDateTime>Apr 07 14:55 CEST</StartDateTime>
+		<StartTestTime>1775566544</StartTestTime>
+		<TestList/>
+		<EndDateTime>Apr 07 14:55 CEST</EndDateTime>
+		<EndTestTime>1775566544</EndTestTime>
+		<ElapsedMinutes>0</ElapsedMinutes>
+	</Testing>
+</Site>
