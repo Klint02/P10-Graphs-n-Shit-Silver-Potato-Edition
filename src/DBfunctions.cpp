@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <set>
 #include <sstream>
+#include <unordered_set>
 //function that returns data based on the query it gets.
 std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* query){
     
@@ -165,7 +166,7 @@ bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
                         "MERGE (a)-[:CONNECTED_TO]->(b) "
                         "$$) AS (e agtype);";
     
-        std::vector<std::pair<std::string,std::string>> edges;
+        std::set<std::pair<std::string,std::string>> edges;
         std::unordered_map<std::string,std::vector<std::string>> point_map;
 
         // Build map: point -> segment IDs
@@ -183,7 +184,7 @@ bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
             auto add_edges = [&](const std::string& point) {
                 for (const auto& other_id : point_map[point]) {
                     if (seg_id != other_id) {
-                        edges.push_back({seg_id, other_id});
+                        edges.insert({seg_id, other_id});
                     }
                 }
             };
@@ -202,21 +203,26 @@ bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
 
     //var declarations
     std::string fill_query = start + middle_str + end; 
-    
+             
+
+    PQexec(conn, "BEGIN");
 
     //Executes query and stores result.
     PGresult* res = PQexec(conn,fill_query.c_str());
     if(PQresultStatus(res) != PGRES_TUPLES_OK){
         std::cerr << "add_edges() Failed to execute" <<PQerrorMessage(conn)<< std::endl;
         PQclear(res);
+
+        PQexec(conn, "ROLLBACK");
         return false; 
     }
 
     PQclear(res);
+    PQexec(conn, "COMMIT");
 
-    auto finish{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed{finish-start_timer};
-    std::cout<< "add_edges() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed2.count() <<" seconds" << std::endl;
 
 
     return true;
