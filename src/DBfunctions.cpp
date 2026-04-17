@@ -864,6 +864,109 @@ bool insert_segments_as_edges(PGconn *conn, const db_result_t &data, const std::
     return true;
 }
 
+//Extracts the data from csv file and returns the result as a matrix[rows X cols] of type strings.
+std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::string& filepath){
+    auto start_timer{std::chrono::steady_clock::now()};
+
+    //var declaration.
+    std::vector<std::vector<std::string>> result;
+    std::ifstream file(filepath);
+
+    //checks of file is open, otherwose throws error.
+    if(!file.is_open()){
+        std::cerr << "Failed to open file: " << filepath << std::endl;
+        return result; 
+    }
+
+    std::string line;
+
+    //skips first line
+    std::getline(file,line);
+
+    while(std::getline(file,line))
+    {
+        std::vector<std::string> row;
+        std::stringstream ss(line);
+        std::string part1;
+        std::string part2;
+        std::string part3;
+        
+        std::getline(ss,part1,'{');
+        std::getline(ss,part2,'}');
+        std::getline(ss,part3);
+        
+        std::stringstream ssp1(part1);
+        std::stringstream ssp3(part3);
+        std::string cell;
+
+        //loops through the cells in the current row.
+        while(std::getline(ssp1,cell,','))
+        {
+            // std::cout << cell << std::endl;
+            if(cell != "\"") row.push_back(cell);
+        }
+        row.push_back("\"{"+part2+"}\"");
+        while(std::getline(ssp3,cell,','))
+        {
+            // std::cout << cell << std::endl;
+            if(cell != "\"") row.push_back(cell);
+        }
+        ss.str(""); ss.clear(); 
+        // std::cout << row[4] << std::endl;
+        result.push_back(row);
+    }
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "Extract_Data_From_CSV() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    
+    //closes file and returns result as a matrix of strings
+    file.close();
+    result.shrink_to_fit();
+    return result;
+}
+
+bool insert_trips_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data){
+    auto start_timer{std::chrono::steady_clock::now()};
+    const size_t BATCH_SIZE = 1000;
+    //var declarations
+    std::string start = "select * from cypher('dummy_graph',$$ unwind [";
+
+    std::string end = "] as row MERGE (t:Trip {id: row.trip_id}) "
+                      "SET t.segment_amount = row.segment_amount, "
+                      "t.segment_array = row.segment_array, "
+                      "t.total_meters_driven = row.total_meters_driven, "
+                      "t.geo_trip = row.geo_trip $$) as (n agtype);";
+
+    //takes the extracted CSV data and makes a node for every row in the matrix.
+
+    for(size_t i = 0; i<data.size(); i+=BATCH_SIZE){
+        std::string middle="";
+        for (size_t j = i; j < i+BATCH_SIZE && j<data.size(); ++j)
+        {
+            // middle += "{trip_id:" + data[j][0] + ", segment_amount: " + data[j][1] + ", segment_array: " + data[j][2] + ", total_meters_driven: " + data[j][3] + ", geo_trip: " + data[j][4] +  "},";
+            middle += "{trip_id:" + data[j][0] + ", segment_amount: " + data[j][1] + ", segment_array: " + data[j][2] + ", total_meters_driven: " + data[j][3] + "},";
+            // std::cout << data[j][3] << std::endl;
+        }
+        if (!middle.empty()) middle.pop_back();
+        std::string query = start + middle + end;
+        PGresult* res= PQexec(conn, query.c_str());    
+        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+            std::cerr << "insert_trips_as_nodes() failed: " << PQerrorMessage(conn) << std::endl;
+            PQclear(res);
+            return false;
+        }
+        PQclear(res);
+    }
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "insert_trips_as_nodes() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    
+    return true;
+}
 
 
 std::string DBfunctions::escape_quotes(std::string s)
