@@ -22,18 +22,20 @@ int main() {
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
 
     //query used to test if it is possible to return data from apache age.
-    const char* query = "select * from cypher('dummy_graph',$$ match(n)-[r]->(m) return n,r,m $$) as (n agtype, r agtype, m agtype);";
+    //const char* query = "select * from cypher('dummy_graph',$$ match(n)-[r]->(m) return n,r,m $$) as (n agtype, r agtype, m agtype);";
 
     //returnResult is from the library in src/DBfunctions.cpp
-    std::vector<std::vector<std::string>> test = returnResult(conn,query);
+    //std::vector<std::vector<std::string>> test = returnResult(conn,query);
 
     //inserts all segments as nodes into apache age.
     //insert_segments_as_nodes(conn,data);
     
+    insert_points_as_nodes_normal_graph(conn, data);
+    add_segments_as_edges_to_normal_graph(conn,data);
     //add_edges(conn, data);
     
     //std::vector<std::vector<std::string>> testForPrint =extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
-    debug_print(test);
+    //debug_print(test);
 
     //Closes connection to DB
     PQfinish(conn);
