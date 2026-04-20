@@ -3,11 +3,12 @@
 #include <set>
 #include <sstream>
 #include <unordered_set>
+
 //function that returns data based on the query it gets.
-std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* query){
+db_result_t returnResult(PGconn* conn, const char* query){
     
     //Result variable
-    std::vector<std::vector<std::string>> result;
+    db_result_t result;
 
     //Checks if the query went through otherwise gives an error.
     PGresult* res= PQexec(conn, query);
@@ -36,11 +37,11 @@ std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* que
 } 
 
 //Extracts the data from csv file and returns the result as a matrix[rows X cols] of type strings.
-std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& filepath){
+db_result_t extract_Data_From_CSV(const std::string& filepath){
     auto start_timer{std::chrono::steady_clock::now()};
 
     //var declaration.
-    std::vector<std::vector<std::string>> result;
+    db_result_t result;
     std::ifstream file(filepath);
 
     //checks of file is open, otherwose throws error.
@@ -91,7 +92,7 @@ std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& f
 }
 
 //Pretty for terminal 
-void debug_print(std::vector<std::vector<std::string>>& table){
+void debug_print(db_result_t& table){
     
      std::vector<size_t> colWidths;
 
@@ -114,7 +115,7 @@ void debug_print(std::vector<std::vector<std::string>>& table){
 }
 
 //takes data extracted from csv and insert into apache age.
-bool insert_segments_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data){
+bool insert_segments_as_nodes(PGconn* conn, const db_result_t& data){
     auto start_timer{std::chrono::steady_clock::now()};
     const size_t BATCH_SIZE = 1000;
     //var declarations
@@ -156,7 +157,7 @@ bool insert_segments_as_nodes(PGconn* conn, const std::vector<std::vector<std::s
 
 //adds edges between nodes where either start_point or end_point overlaps. Does not take direction into consideration.
 //TODO(RBN): make Check for directions.
-bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
+bool add_edges(PGconn* conn, db_result_t& data){
 
     auto start_timer{std::chrono::steady_clock::now()};
 

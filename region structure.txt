@@ -1,0 +1,7 @@
+Region (region_name, region_code) antal 1
+    Municipality (name, code) antal 1
+        sub_municipalities(dk_municipalitykey) antal mange
+
+Region[region_code] -> {ID på region_node, liste af municipality_code} 
+Municipality[code] -> {ID på municipality_node, liste af sub_municipality_keys} 
+sub_municipalities[dk_municipalitykey] -> ID på sub_municipality_node

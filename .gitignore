@@ -42,3 +42,6 @@
 
 # Build file
 out
+
+# Internals
+.info.yaml
