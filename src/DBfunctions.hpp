@@ -7,6 +7,7 @@
 #include <string>
 #include <iomanip>
 #include <chrono>
+#include <algorithm>
 
 
 //TODO(nkc): turn into struct that has a map of each column linked to each column
@@ -24,10 +25,6 @@ void debug_print(db_result_t& table);
 bool insert_segments_as_nodes(PGconn* conn, const db_result_t& data); 
 
 bool add_edges(PGconn* conn, db_result_t& data);
-
-std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::string& filepath);
-
-bool insert_trips_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data);
 
 class DBfunctions
 {
@@ -67,3 +64,14 @@ private:
     bool BenchmarkQuery(std::string benchmark_name, const std::string query);
 };
 
+struct Trip_row {
+    int trip_id;
+    int segment_amount;
+    std::vector<int> segment_array;
+    double total_meters_driven;
+    std::string geo_trip;
+};
+
+std::vector<Trip_row> extract_Trip_Data_From_CSV(const std::string& filepath);
+
+bool insert_trips_as_nodes(PGconn* conn, const std::vector<Trip_row>& data);

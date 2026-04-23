@@ -865,11 +865,11 @@ bool insert_segments_as_edges(PGconn *conn, const db_result_t &data, const std::
 }
 
 //Extracts the data from csv file and returns the result as a matrix[rows X cols] of type strings.
-std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::string& filepath){
+std::vector<Trip_row> extract_Trip_Data_From_CSV(const std::string& filepath){
     auto start_timer{std::chrono::steady_clock::now()};
 
     //var declaration.
-    std::vector<std::vector<std::string>> result;
+    std::vector<Trip_row> result;
     std::ifstream file(filepath);
 
     //checks of file is open, otherwose throws error.
@@ -885,7 +885,8 @@ std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::stri
 
     while(std::getline(file,line))
     {
-        std::vector<std::string> row;
+        Trip_row row;
+        std::vector<std::string> temp_row;
         std::stringstream ss(line);
         std::string part1;
         std::string part2;
@@ -903,16 +904,40 @@ std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::stri
         while(std::getline(ssp1,cell,','))
         {
             // std::cout << cell << std::endl;
-            if(cell != "\"") row.push_back(cell);
+            if(cell != "\"") temp_row.push_back(cell);
         }
-        row.push_back("\"{"+part2+"}\"");
+        
+        // temp_row.push_back("{"+part2+"}");
+        temp_row.push_back(part2);
+        
         while(std::getline(ssp3,cell,','))
         {
             // std::cout << cell << std::endl;
-            if(cell != "\"") row.push_back(cell);
+            if(cell != "\"") temp_row.push_back(cell);
         }
-        ss.str(""); ss.clear(); 
-        // std::cout << row[4] << std::endl;
+
+        temp_row[4].erase(temp_row[4].find_last_not_of(" \n\r\t") + 1);
+        
+        for(int i=0; i<5; i++){
+            if(temp_row[i].front() == '"'){
+                temp_row[i].erase(temp_row[i].begin());
+            }
+            if(temp_row[i].back() == '"'){
+                temp_row[i].erase(temp_row[i].end()-1);
+            }
+        }
+        
+        row.trip_id = std::stoi(temp_row[0]);
+        row.segment_amount = std::stoi(temp_row[1]);
+        std::stringstream ssarr(temp_row[2]);
+        while(std::getline(ssarr,cell,','))
+        {
+            row.segment_array.push_back(std::stoi(cell));
+        }
+        row.total_meters_driven = std::stod(temp_row[3]);
+        row.geo_trip = temp_row[4];
+
+        ss.str(""); ss.clear();
         result.push_back(row);
     }
 
@@ -927,31 +952,40 @@ std::vector<std::vector<std::string>> extract_Trip_Data_From_CSV(const std::stri
     return result;
 }
 
-bool insert_trips_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data){
+bool insert_trips_as_nodes(PGconn* conn, const std::vector<Trip_row>& data){
     auto start_timer{std::chrono::steady_clock::now()};
     const size_t BATCH_SIZE = 1000;
     //var declarations
-    std::string start = "select * from cypher('dummy_graph',$$ unwind [";
+    std::string start = "select * from cypher('chr_dummy_graph',$$ unwind [";
 
     std::string end = "] as row MERGE (t:Trip {id: row.trip_id}) "
                       "SET t.segment_amount = row.segment_amount, "
                       "t.segment_array = row.segment_array, "
-                      "t.total_meters_driven = row.total_meters_driven, "
-                      "t.geo_trip = row.geo_trip $$) as (n agtype);";
+                      "t.total_meters_driven = row.total_meters_driven"//, "
+                    //   "t.geo_trip = row.geo_trip "
+                    "$$) as (n agtype);";
 
     //takes the extracted CSV data and makes a node for every row in the matrix.
 
-    for(size_t i = 0; i<data.size(); i+=BATCH_SIZE){
+    for (size_t i = 0; i<data.size(); i+=BATCH_SIZE){
         std::string middle="";
         for (size_t j = i; j < i+BATCH_SIZE && j<data.size(); ++j)
         {
+            std::string arr_to_string="\"{";
+            for (int arr_size = 0; arr_size<data[j].segment_array.size(); arr_size++){
+                arr_to_string += std::to_string(data[j].segment_array[arr_size]) + ",";
+            }
+            if (!arr_to_string.empty()) {
+                arr_to_string.pop_back();
+            }
+            arr_to_string += "}\"";
+            
             // middle += "{trip_id:" + data[j][0] + ", segment_amount: " + data[j][1] + ", segment_array: " + data[j][2] + ", total_meters_driven: " + data[j][3] + ", geo_trip: " + data[j][4] +  "},";
-            middle += "{trip_id:" + data[j][0] + ", segment_amount: " + data[j][1] + ", segment_array: " + data[j][2] + ", total_meters_driven: " + data[j][3] + "},";
-            // std::cout << data[j][3] << std::endl;
+            middle += "{trip_id: " + std::to_string(data[j].trip_id) + ", segment_amount: " + std::to_string(data[j].segment_amount) + ", segment_array: " + arr_to_string + ", total_meters_driven: " + std::to_string(data[j].total_meters_driven) + "},";
         }
         if (!middle.empty()) middle.pop_back();
         std::string query = start + middle + end;
-        PGresult* res= PQexec(conn, query.c_str());    
+        PGresult* res= PQexec(conn, query.c_str());
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
             std::cerr << "insert_trips_as_nodes() failed: " << PQerrorMessage(conn) << std::endl;
             PQclear(res);
