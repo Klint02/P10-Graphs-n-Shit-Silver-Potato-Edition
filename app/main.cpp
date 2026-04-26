@@ -15,55 +15,14 @@ int main() {
     const std::string dbname = config["database-name"].as<std::string>();
     const std::string username = config["database-user"].as<std::string>();
     const std::string password = config["password"].as<std::string>();
+    const std::string graph_prefix = config["graph_prefix"].as<std::string>();
+    const std::string graph_name = graph_prefix + "dummy1_graph";
 
+    DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
 
-    //Making connection.
-    const std::string conninfo = "host=" + host + " port=" + port + " dbname=" + dbname + " user=" + username + " password=" + password;
-    PGconn* conn = PQconnectdb(conninfo.c_str());
-    
-    // checks for connection to DB if not, gives and error.
-    switch (PQstatus(conn))
-    {
-    case CONNECTION_OK:
-        std::cout << "Connection to postgres succesful" << std::endl; 
-        break;
-    default:
-        std::cerr << "Connection failed, maybe check if Docker container is running" << std::endl;
+    db.CreateMunicipalities();
 
-        break;
-    }
-        
-    db_result_t municipalities = returnResult(conn, "SELECT * FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
-
-    std::string current_city;
-    std::string current_region;
-    uint8_t sub_municipality_count = 1;
-    std::cout << municipalities.size() << std::endl;
-    
-    for (const auto& sub_municipality : municipalities) {
-
-        if (current_region.compare(sub_municipality.at(2))) {
-            //std::cout << current_region << " is not " << sub_municipality.at(2) << std::endl;
-            current_region = sub_municipality.at(2);
-            std::cout << std::format("SELECT * FROM cypher('nicklas_dummy_graph', $$ CREATE (:region {{name: '{}', region_code: '{}'}}) $$) as (n agtype)", sub_municipality.at(4), sub_municipality.at(2)) << std::endl;
-            
-        }
-        if (current_city.compare(sub_municipality.at(1))) {
-            sub_municipality_count = 1;
-            //std::cout << current_city << " is not " << sub_municipality.at(1) << std::endl;
-            current_city = sub_municipality.at(1);
-            std::cout << std::format("SELECT * FROM cypher('nicklas_dummy_graph', $$ CREATE (:municipality {{name: '{}', code: '{}'}}) $$) as (n agtype)", sub_municipality.at(3), sub_municipality.at(1)) << std::endl;
-    
-        }
-        std::cout << std::format("SELECT * FROM cypher('nicklas_dummy_graph', $$ CREATE (:sub_municipality {{name: '{}-{}', dk_municipalitykey: '{}'}}) $$) as (n agtype)", sub_municipality_count, sub_municipality.at(3), sub_municipality.at(0)) << std::endl;
-        sub_municipality_count += 1;
-        
-    }
-
-    /*
-    //Declares search path for apache age
-    PGresult* res = PQexec(conn,"set search_path = ag_catalog, \"$user\", public;");   
-    
+/*
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
     
     //query used to test if it is possible to return data from apache age.
