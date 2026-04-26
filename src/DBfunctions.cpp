@@ -2,12 +2,85 @@
 #include <unordered_map>
 #include <set>
 #include <sstream>
+#include <format>
+
 #include <unordered_set>
+
+DBfunctions::DBfunctions(const std::string& host,
+                const std::string& port,
+                const std::string& dbname,
+                const std::string& username,
+                const std::string& password,
+                const std::string& graph_prefix,
+                const std::string& graph_name)
+                : graph_name_(graph_name)
+{
+    //Making connection.
+    const std::string conninfo = "host=" + host + " port=" + port + " dbname=" + dbname + " user=" + username + " password=" + password;
+    conn_ = PQconnectdb(conninfo.c_str());
+    // checks for connection to DB if not, gives and error.
+    switch (PQstatus(conn_))
+    {
+    case CONNECTION_OK:
+        std::cout << "Connection to postgres succesful" << std::endl; 
+        //Declares search path for apache age
+        res_ = PQexec(conn_, R"(set search_path = ag_catalog, "$user", public;)");   
+        res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.drop_graph('{}', true)", graph_name).c_str()); 
+        res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.create_graph('{}');", graph_name).c_str());   
+        break;
+    default:
+        std::cerr << "Connection failed, maybe check if Docker container is running" << std::endl;
+        break;
+    }
+
+
+}
+
+bool DBfunctions::ResetGraph()
+{
+    //TODO(NKC): implement error checking
+    res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.drop_graph('{}', true)", graph_name_).c_str()); 
+    res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.create_graph('{}');", graph_name_).c_str());   
+    return true;
+}
+
+bool DBfunctions::CreateMunicipalities() 
+{
+    //TODO(NKC): implement error checking
+    db_result_t municipalities = returnResult(conn_, "SELECT * FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
+    
+    std::string current_city;
+    std::string current_region;
+    uint8_t sub_municipality_count = 1;
+    std::cout << municipalities.size() << std::endl;
+    
+    for (const auto& sub_municipality : municipalities) {
+        if (current_region.compare(sub_municipality.at(2))) {
+            //std::cout << current_region << " is not " << sub_municipality.at(2) << std::endl;
+            current_region = sub_municipality.at(2);
+            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:region {{name: '{}', region_code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(4), sub_municipality.at(2)).c_str());
+        }
+        if (current_city.compare(sub_municipality.at(1))) {
+            sub_municipality_count = 1;
+            //std::cout << current_city << " is not " << sub_municipality.at(1) << std::endl;
+            current_city = sub_municipality.at(1);
+            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:municipality {{name: '{}', code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(3), sub_municipality.at(1)).c_str());
+            PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:region), (b:municipality) WHERE a.region_code = '{}' AND b.code = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(2), sub_municipality.at(1)).c_str());
+            
+        }
+        PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:sub_municipality {{name: '{}-{}', dk_municipalitykey: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality_count, sub_municipality.at(3), sub_municipality.at(0)).c_str());
+        PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:municipality), (b:sub_municipality) WHERE a.code = '{}' AND b.dk_municipalitykey = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(1), sub_municipality.at(0)).c_str());
+        
+        sub_municipality_count += 1;
+    }
+    return true;
+}
+
 //function that returns data based on the query it gets.
-std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* query){
+db_result_t returnResult(PGconn* conn, const char* query){
     
     //Result variable
-    std::vector<std::vector<std::string>> result;
+    db_result_t result;
 
     //Checks if the query went through otherwise gives an error.
     PGresult* res= PQexec(conn, query);
@@ -36,11 +109,11 @@ std::vector<std::vector<std::string>> returnResult(PGconn* conn, const char* que
 } 
 
 //Extracts the data from csv file and returns the result as a matrix[rows X cols] of type strings.
-std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& filepath){
+db_result_t extract_Data_From_CSV(const std::string& filepath){
     auto start_timer{std::chrono::steady_clock::now()};
 
     //var declaration.
-    std::vector<std::vector<std::string>> result;
+    db_result_t result;
     std::ifstream file(filepath);
 
     //checks of file is open, otherwose throws error.
@@ -91,7 +164,7 @@ std::vector<std::vector<std::string>> extract_Data_From_CSV(const std::string& f
 }
 
 //Pretty for terminal 
-void debug_print(std::vector<std::vector<std::string>>& table){
+void debug_print(db_result_t& table){
     
      std::vector<size_t> colWidths;
 
@@ -114,7 +187,7 @@ void debug_print(std::vector<std::vector<std::string>>& table){
 }
 
 //takes data extracted from csv and insert into apache age.
-bool insert_segments_as_nodes(PGconn* conn, const std::vector<std::vector<std::string>>& data){
+bool insert_segments_as_nodes(PGconn* conn, const db_result_t& data){
     auto start_timer{std::chrono::steady_clock::now()};
     const size_t BATCH_SIZE = 1000;
     //var declarations
@@ -156,7 +229,7 @@ bool insert_segments_as_nodes(PGconn* conn, const std::vector<std::vector<std::s
 
 //adds edges between nodes where either start_point or end_point overlaps. Does not take direction into consideration.
 //TODO(RBN): make Check for directions.
-bool add_edges(PGconn* conn, std::vector<std::vector<std::string>>& data){
+bool add_edges(PGconn* conn, db_result_t& data){
 
     auto start_timer{std::chrono::steady_clock::now()};
 
