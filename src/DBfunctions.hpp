@@ -75,3 +75,5 @@ struct Trip_row {
 std::vector<Trip_row> extract_Trip_Data_From_CSV(const std::string& filepath);
 
 bool insert_trips_as_nodes(PGconn* conn, const std::vector<Trip_row>& data);
+
+bool add_trip_edges(PGconn* conn, std::vector<std::vector<std::string>>& segment_data, const std::vector<Trip_row>& trip_data);

@@ -1013,3 +1013,182 @@ std::string DBfunctions::escape_quotes(std::string s)
     }
     return s;
 }
+bool add_trip_edges(PGconn* conn, std::vector<std::vector<std::string>>& segment_data, const std::vector<Trip_row>& trip_data){
+
+    auto start_timer{std::chrono::steady_clock::now()};
+
+    //var declarations
+    // std::string query = "SELECT * FROM cypher('dummy_graph', $$ "
+    //     "MATCH (t:Trip) "
+    //     "WITH t, replace(replace(t.segment_array, '{', ''), '}', '') AS cleaned "
+    //     "WITH t, split(cleaned, ',') AS segment_array "
+    //     "UNWIND segment_array AS seg_id "
+    //     "MATCH (s:Segment {id: toInteger(seg_id)}) "
+    //     "WITH t, s "
+    //     "LIMIT 10 "
+    //     "CREATE (t)-[:USES]->(s) "
+    //     "RETURN t, s "
+    //     "$$) AS (t agtype, s agtype);";
+
+    std::unordered_map<int, long> segment_map;
+
+    std::string segment_map_query = "SELECT * FROM cypher('chr_dummy_graph', $$ "
+    "MATCH (s:Segment) "
+    "RETURN s.id, id(s) "
+    "$$) AS (segment_id agtype, segment_vertex_id agtype);";
+
+    PGresult* segment_map_result = PQexec(conn,segment_map_query.c_str());
+    if(PQresultStatus(segment_map_result) != PGRES_TUPLES_OK){
+        std::cerr << "Query for segment id and table location failed to execute" <<PQerrorMessage(conn)<< std::endl;
+        PQclear(segment_map_result);
+        return false; 
+    }
+
+    int segment_rows = PQntuples(segment_map_result);
+    for (int i = 0; i < segment_rows; i++) {
+        int segment_id = std::stoi(PQgetvalue(segment_map_result, i, 0));
+        long segment_vertex_id = std::stol(PQgetvalue(segment_map_result, i, 1));
+        segment_map[segment_id] = segment_vertex_id;
+    }
+    
+    PQclear(segment_map_result);
+
+    // std::cout << segment_map[438714] << std::endl;
+    // for(int j = 0; j < segment_data.size(); j++){
+    //     if(std::stoi(segment_data[j][0])==438714){
+    //         std::cout << "yes" << std::endl;
+    //     }
+    //     std::cout << segment_map[std::stoi(segment_data[j][0])] << std::endl;
+    // }
+
+    
+    std::unordered_map<int, long> trip_map;
+
+    std::string trip_map_query = "SELECT * FROM cypher('chr_dummy_graph', $$ "
+    "MATCH (t:Trip) "
+    "RETURN t.id, id(t) "
+    "$$) AS (trip_id agtype, trip_vertex_id agtype);";
+
+    PGresult* trip_map_result = PQexec(conn,trip_map_query.c_str());
+    if(PQresultStatus(trip_map_result) != PGRES_TUPLES_OK){
+        std::cerr << "Query for trip id and table location failed to execute" <<PQerrorMessage(conn)<< std::endl;
+        PQclear(trip_map_result);
+        return false; 
+    }
+
+    int trip_rows = PQntuples(trip_map_result);
+    for (int j = 0; j < trip_rows; j++) {
+        int trip_id = std::stoi(PQgetvalue(trip_map_result, j, 0));
+        long trip_vertex_id = std::stol(PQgetvalue(trip_map_result, j, 1));
+        trip_map[trip_id] = trip_vertex_id;
+    }
+    
+    PQclear(trip_map_result);
+
+    // std::cout << trip_map[123610] << std::endl;
+    // for(int k = 0; k < trip_data.size(); k++){
+    //     if(trip_data[k].trip_id==123610){
+    //         std::cout << "yes" << std::endl;
+    //     }
+    //     std::cout << trip_map[trip_data[k].trip_id] << std::endl;
+    // }
+    // std::cout << trip_map.find(123610)->first << std::endl;
+
+    const size_t BATCH_SIZE = 1000;
+    
+    std::string start = "SELECT * FROM cypher('chr_dummy_graph', $$ unwind [";
+    std::string end = "] AS row "
+                        "MATCH (t), (s) "
+                        "WHERE id(t) = row.from AND id(s) = row.to "
+                        "CREATE (t)-[r:USES]->(s) "
+                        "SET r.occurrance_array = row.occurrance_array "
+                        "$$) AS (r agtype);";
+
+    // for(size_t k = 0; k < trip_data.size(); k += BATCH_SIZE){
+    //     std::string middle="";
+    //     for (size_t l = k; l < k+BATCH_SIZE && k < trip_data.size(); k++){
+    //         for(int segment_id : trip_data[l].segment_array){
+    //             middle += "{from:" + std::to_string(trip_map[trip_data[l].trip_id]) + ", to: " + std::to_string(segment_map[segment_id]) + "},";
+    //         }
+    //     }
+    //     if (!middle.empty()) middle.pop_back();
+
+    //     std::string query = start + middle + end;
+
+    //     PGresult* res= PQexec(conn, query.c_str());    
+    //     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    //         std::cerr << "add_trip_edges() failed: " << PQerrorMessage(conn) << std::endl;
+    //         PQclear(res);
+    //         return false;
+    //     }
+    //     PQclear(res);
+    // }
+
+    int sum = 0;
+    for(size_t c = 0; c < trip_data.size(); c += BATCH_SIZE){
+        // for(size_t k = 0; k < trip_data.size(); k++){
+        for(size_t k = c; k < c+BATCH_SIZE && k < trip_data.size(); k++){
+            std::string middle="";
+            sum+=trip_data[k].segment_array.size();
+            std::unordered_map<int,std::vector<int>> occurrance_array;
+            int count=0;
+            for(int segment_id : trip_data[k].segment_array){
+               count++;
+                if(occurrance_array.find(segment_id) == occurrance_array.end()){
+                    occurrance_array[segment_id] = {count};
+                } else {
+                    // occurrance_array[segment_id] = {occurrance_array[segment_id][0]+1,0};
+                    occurrance_array[segment_id].push_back(count);
+                }
+                // for (auto p : occurrance_array[segment_id]){
+                //     std::cout << p << " ";
+                // }
+                // std::cout << std::endl;
+                // std::cout << segment_id << ": " << "{"+std::to_string(occurrance_array[segment_id][0])+","+std::to_string(occurrance_array[segment_id][1])+"}" << std::endl;
+            }
+            for(int segment_id : trip_data[k].segment_array){
+                if(*(occurrance_array[segment_id].end()-1)==-1) continue;
+                middle += "{from:" + std::to_string(trip_map[trip_data[k].trip_id]) + ", to:" + std::to_string(segment_map[segment_id]) + ", occurrance_array:[";
+                for(int occurrance : occurrance_array[segment_id]){
+                    middle += std::to_string(occurrance) + ",";
+                }
+                if (middle.back() == ',') middle.pop_back();
+                middle += "]},";
+                occurrance_array[segment_id].push_back(-1);
+                // occurrance_array[segment_id][1]++;
+            }
+            if (!middle.empty()) middle.pop_back();
+        
+            std::string query = start + middle + end;
+            // std::cout << query.size() << std::endl;
+
+            PGresult* res= PQexec(conn, query.c_str());    
+            if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+                std::cerr << "add_trip_edges() failed: " << PQerrorMessage(conn) << std::endl;
+                PQclear(res);
+                return false;
+            }
+            PQclear(res);
+
+            if(k%10==0) std::cout << k << std::endl;
+        }
+    }
+    std::cout << sum << std::endl;
+
+    //Executes query and stores result.
+    // PGresult* res = PQexec(conn,query.c_str());
+    // if(PQresultStatus(res) != PGRES_TUPLES_OK){
+    //     std::cerr << "add_edges() Failed to execute" <<PQerrorMessage(conn)<< std::endl;
+    //     PQclear(res);
+    //     return false; 
+    // }
+
+    // PQclear(res);
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed.count() <<" seconds" << std::endl;
+
+    return true;
+}
+
