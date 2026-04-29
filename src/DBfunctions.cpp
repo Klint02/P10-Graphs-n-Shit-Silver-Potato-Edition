@@ -217,6 +217,40 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities()
         }
         */
     }
+
+}
+bool DBfunctions::CreateTrips() 
+{
+    auto start_timer{std::chrono::steady_clock::now()};
+    
+    //TODO(CLM): Find a faster way to include geo_trip. Current way (commented out) is 5 times slower due to inner join.
+    db_result_t trips = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trip_duration, ARRAY_AGG(seconds) as segment_duration "
+                                            "FROM mapmatched_data.viterbi_match_osm_dk_20140101 "
+                                            "GROUP BY trip_id");
+    // db_result_t trips = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(trip.segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trip_duration, ARRAY_AGG(seconds) as segment_duration, ST_Union(segmentgeo::geometry) as geo_trip "
+    //                                         "FROM(SELECT trip_id, segmentkey, meters_driven, seconds "
+    //                                         "FROM mapmatched_data.viterbi_match_osm_dk_20140101) trip "
+    //                                         "INNER JOIN (SELECT segmentkey, segmentgeo "
+    //                                         "FROM maps.osm_dk_20140101) segmentmap "
+    //                                         "ON trip.segmentkey = segmentmap.segmentkey "
+    //                                         "GROUP BY trip_id");
+
+    for(auto trip : trips){
+        PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:trip {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}'}}) $$) as (n agtype)", graph_name_, trip.at(0), trip.at(1), trip.at(2), trip.at(3), trip.at(4)).c_str());
+        // PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:trip {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}', geotrip: '{}'}}) $$) as (n agtype)", graph_name_, trip.at(0), trip.at(1), trip.at(2), trip.at(3), trip.at(4), trip.at(6)).c_str());
+    }
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "It took took " << time_elapsed.count() <<" seconds to compute" << std::endl;
+        
+    return true;
+}
+
+
+//function that returns data based on the query it gets.
+db_result_t returnResult(PGconn* conn, const char* query){
     
     auto finish2{std::chrono::steady_clock::now()};
     std::chrono::duration<double> time_elapsed2{finish2-start_timer};
@@ -957,7 +991,6 @@ bool insert_trips_as_nodes(PGconn* conn, const std::vector<Trip_row>& data){
     const size_t BATCH_SIZE = 1000;
     //var declarations
     std::string start = "select * from cypher('chr_dummy_graph',$$ unwind [";
-
     std::string end = "] as row MERGE (t:Trip {id: row.trip_id}) "
                       "SET t.segment_amount = row.segment_amount, "
                       "t.segment_array = row.segment_array, "
