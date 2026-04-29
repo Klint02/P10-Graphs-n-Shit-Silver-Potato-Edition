@@ -17,30 +17,31 @@ typedef std::vector<std::vector<std::string>> db_result_t;
 
 db_result_t returnResult(PGconn* conn, const char* query); 
 
-db_result_t extract_Data_From_CSV(const std::string& filepath);
+//db_result_t extract_Data_From_CSV(const std::string& filepath);
 
 void debug_print(db_result_t& table);
 
-bool insert_segments_as_nodes(PGconn* conn, const db_result_t& data); 
-
-bool add_edges(PGconn* conn, db_result_t& data);
-
 class DBfunctions
 {
-private:
+    private:
     PGconn* conn_;
     PGresult* res_;
     const std::string graph_name_;
-
     
-public:
+    
+    public:
     DBfunctions(const std::string& host,
-                const std::string& port,
-                const std::string& dbname,
-                const std::string& username,
-                const std::string& password,
-                const std::string& graph_prefix,
-                const std::string& graph_name);
-    bool ResetGraph();
-    bool CreateMunicipalities();
+        const std::string& port,
+        const std::string& dbname,
+        const std::string& username,
+        const std::string& password,
+        const std::string& graph_prefix,
+        const std::string& graph_name);
+        bool ResetGraph();
+        bool CreateMunicipalities();
+        bool insert_segments_as_nodes(const db_result_t& data);
+        bool add_edges_between_segments(const db_result_t& data);
+        bool add_edges_between_segments_and_submunicipality(const db_result_t& data, const std::string code);
+
+
 };

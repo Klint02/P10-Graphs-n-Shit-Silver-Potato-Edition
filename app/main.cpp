@@ -21,7 +21,7 @@ int main() {
     DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
 
     db.CreateMunicipalities();
-
+    
 /*
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
     
