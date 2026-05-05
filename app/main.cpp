@@ -16,11 +16,12 @@ int main() {
     const std::string username = config["database-user"].as<std::string>();
     const std::string password = config["password"].as<std::string>();
     const std::string graph_prefix = config["graph_prefix"].as<std::string>();
-    const std::string graph_name = graph_prefix + "dummy1_graph";
+    const std::string graph_name = graph_prefix + "segment_as_nodes_graph";
 
     DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
 
     db.CreateMunicipalities();
+    db.CreateNodesForAllSubMunicipalities();
 
 /*
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");

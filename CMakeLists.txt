@@ -21,12 +21,12 @@ find_package(PostgreSQL REQUIRED)
 # Library
 add_library(some_lib src/DBfunctions.cpp)
 target_include_directories(some_lib PUBLIC include src ${PostgreSQL_INCLUDE_DIRS})
-target_link_libraries(some_lib PRIVATE PostgreSQL::PostgreSQL)
+target_link_libraries(some_lib PUBLIC PostgreSQL::PostgreSQL)
 target_link_libraries(some_lib PUBLIC yaml-cpp::yaml-cpp) # The library or executable that require yaml-cpp library
 
 # Executable
 add_executable(P10-graphs-and-shit app/main.cpp)
-target_link_libraries(P10-graphs-and-shit PRIVATE some_lib)
+target_link_libraries(P10-graphs-and-shit PUBLIC some_lib)
 
 
 # Testing

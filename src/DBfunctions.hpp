@@ -31,7 +31,16 @@ private:
     PGconn* conn_;
     PGresult* res_;
     const std::string graph_name_;
-
+    struct Segment {
+        public:
+        std::string segmentkey;
+        std::string startpoint;
+        std::string endpoint;
+        std::string category;
+        std::string direction;
+        std::string name;
+        std::vector<std::string> municipality_keys;
+    };
     
 public:
     DBfunctions(const std::string& host,
@@ -43,4 +52,5 @@ public:
                 const std::string& graph_name);
     bool ResetGraph();
     bool CreateMunicipalities();
+    bool CreateNodesForAllSubMunicipalities();
 };

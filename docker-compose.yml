@@ -1,17 +1,5 @@
 version: '3'
 services:
-  age:
-    image: apache/age
-    container_name: age
-    environment:
-      - POSTGRES_USER=postgresUser
-      - POSTGRES_PASSWORD=postgresPW
-      - POSTGRES_DB=postgresDB
-    ports:
-      - "5430:5432"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
   age_viewer:
     image: pg:age_viewer
     container_name: age_viewer
@@ -27,6 +15,5 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
-    depends_on:
-      - age
+    network_mode: "host"
     command: npm run start

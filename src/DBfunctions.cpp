@@ -1,5 +1,6 @@
 #include "DBfunctions.hpp"
 #include <unordered_map>
+#include <map>
 #include <set>
 #include <sstream>
 #include <format>
@@ -58,13 +59,13 @@ bool DBfunctions::CreateMunicipalities()
         if (current_region.compare(sub_municipality.at(2))) {
             //std::cout << current_region << " is not " << sub_municipality.at(2) << std::endl;
             current_region = sub_municipality.at(2);
-            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:region {{name: '{}', region_code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(4), sub_municipality.at(2)).c_str());
+            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MERGE (:region {{name: '{}', region_code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(4), sub_municipality.at(2)).c_str());
         }
         if (current_city.compare(sub_municipality.at(1))) {
             sub_municipality_count = 1;
             //std::cout << current_city << " is not " << sub_municipality.at(1) << std::endl;
             current_city = sub_municipality.at(1);
-            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:municipality {{name: '{}', code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(3), sub_municipality.at(1)).c_str());
+            PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MERGE (:municipality {{name: '{}', code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(3), sub_municipality.at(1)).c_str());
             PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:region), (b:municipality) WHERE a.region_code = '{}' AND b.code = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(2), sub_municipality.at(1)).c_str());
             
         }
@@ -72,6 +73,121 @@ bool DBfunctions::CreateMunicipalities()
         PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:municipality), (b:sub_municipality) WHERE a.code = '{}' AND b.dk_municipalitykey = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(1), sub_municipality.at(0)).c_str());
         
         sub_municipality_count += 1;
+    }
+    return true;
+}
+
+bool DBfunctions::CreateNodesForAllSubMunicipalities() {
+    db_result_t municipalities = returnResult(conn_, "SELECT dk_municipalitykey FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
+    std::map<std::string,Segment> segment_map; 
+    for (const auto& sub_municipality : municipalities) {
+        std::string sub_municipality_string = sub_municipality.at(0);
+        std::cout << sub_municipality_string << std::endl;
+        db_result_t segments = returnResult(conn_, std::format("SELECT segmentkey, startpoint, endpoint, category, direction, name FROM maps.osm_dk_20140101 WHERE ST_Intersects(segmentgeo::geometry, (SELECT ST_Union(geog::geometry) FROM regions.dk_municipalities WHERE dk_municipalitykey in ({})));" , sub_municipality.at(0)).c_str());       
+        for (const auto& segment : segments) {
+            
+            if (segment_map.contains(segment.at(0))) {
+                segment_map[segment.at(0)].municipality_keys.emplace_back(sub_municipality_string);
+            } else {
+                segment_map[segment.at(0)] = {};
+                segment_map[segment.at(0)].segmentkey = segment.at(0);
+                segment_map[segment.at(0)].startpoint = segment.at(1);
+                segment_map[segment.at(0)].endpoint = segment.at(2);
+                segment_map[segment.at(0)].category = segment.at(3);
+                segment_map[segment.at(0)].direction = segment.at(4);
+                segment_map[segment.at(0)].name = segment.at(5);
+                segment_map[segment.at(0)].municipality_keys.emplace_back(sub_municipality_string);
+            }
+        }
+    }
+    int it = 1;
+
+    //TODO(nkc): batch up to 2000 segments per database request
+    for (const auto& [key, data] : segment_map) {
+        if (it % 50 == 0) {
+            std::cout << it << std::endl;
+        }
+
+        switch (data.municipality_keys.size())
+        {
+        case 1:
+            PQexec(conn_, std::format(
+                "SELECT * FROM cypher('{}', $$ "
+                "MATCH (a:sub_municipality) "
+                "WHERE a.dk_municipalitykey = '{}' "
+                "CREATE (a)-[:contains]->(:segment {{segmentkey: '{}', startpoint: '{}', endpoint: '{}', category: '{}', direction: '{}', name: '{}' }}) "
+                "$$) as (n agtype);", 
+                graph_name_, 
+                data.municipality_keys.at(0), 
+                data.segmentkey, 
+                data.startpoint, 
+                data.endpoint, 
+                data.category, 
+                data.direction, 
+                data.name
+            ).c_str());
+            break;
+        case 2:
+            PQexec(conn_, std::format(
+                "SELECT * FROM cypher('{}', $$ "
+                "MATCH (a:sub_municipality), (b:sub_municipality) "
+                "WHERE a.dk_municipalitykey = '{}' AND b.dk_municipalitykey = '{}' "
+                "CREATE (a)-[:contains]->(:segment {{segmentkey: '{}', startpoint: '{}', endpoint: '{}', category: '{}', direction: '{}', name: '{}' }})"
+                "<-[:contains]-(b) "
+                "$$) as (n agtype);", 
+                graph_name_, 
+                data.municipality_keys.at(0), 
+                data.municipality_keys.at(1), 
+                data.segmentkey, 
+                data.startpoint, 
+                data.endpoint, 
+                data.category, 
+                data.direction, 
+                data.name
+            ).c_str());
+            break;
+        case 3:
+            PQexec(conn_, std::format(
+                "SELECT * FROM cypher('{}', $$ "
+                "MATCH (a:sub_municipality), (b:sub_municipality), (c:sub_municipality) "
+                "WHERE a.dk_municipalitykey = '{}' AND b.dk_municipalitykey = '{}' AND c.dk_municipalitykey = '{}' "
+                "CREATE (s:segment {{segmentkey: '{}', startpoint: '{}', endpoint: '{}', category: '{}', direction: '{}', name: '{}' }}), "
+                "(a)-[:contains]->(s), (b)-[:contains]->(s), (c)-[:contains]->(s) "
+                "$$) as (n agtype);",
+                graph_name_,
+                data.municipality_keys.at(0),
+                data.municipality_keys.at(1),
+                data.municipality_keys.at(2),
+                data.segmentkey,
+                data.startpoint,
+                data.endpoint,
+                data.category,
+                data.direction,
+                data.name
+            ).c_str());
+            break;
+        default:
+            std::cerr << "Unhandled size " << data.municipality_keys.size() << std::endl;
+            std::cout << "Key: " << key << ", subs: ";
+            
+            for (const auto& el : data.municipality_keys) {
+                std::cout << el << " "; 
+            }
+            std::cout << std::endl;
+            break;
+        }
+        it += 1;
+        /*
+        if (data.size() > 2) {
+            
+        std::cout << "Key: " << key << ", subs: ";
+        
+        for (const auto& el : data) {
+            std::cout << el << " "; 
+        }
+        std::cout << std::endl;
+        }
+        */
     }
     return true;
 }
