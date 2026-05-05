@@ -217,7 +217,7 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities()
         }
         */
     }
-
+    return true;
 }
 bool DBfunctions::CreateTrips() 
 {
