@@ -53,4 +53,5 @@ public:
     bool ResetGraph();
     bool CreateMunicipalities();
     bool CreateNodesForAllSubMunicipalities();
+    bool CreateEdgesForAllSegments();
 };

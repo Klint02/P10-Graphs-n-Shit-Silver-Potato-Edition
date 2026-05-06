@@ -25,9 +25,12 @@ DBfunctions::DBfunctions(const std::string& host,
     case CONNECTION_OK:
         std::cout << "Connection to postgres succesful" << std::endl; 
         //Declares search path for apache age
-        res_ = PQexec(conn_, R"(set search_path = ag_catalog, "$user", public;)");   
+        res_ = PQexec(conn_, R"(set search_path = ag_catalog, "$user", public;)"); 
+        PQclear(res_);  
         res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.drop_graph('{}', true)", graph_name).c_str()); 
+        PQclear(res_);  
         res_ = PQexec(conn_, std::format("SELECT * FROM ag_catalog.create_graph('{}');", graph_name).c_str());   
+        PQclear(res_);  
         break;
     default:
         std::cerr << "Connection failed, maybe check if Docker container is running" << std::endl;
@@ -47,6 +50,9 @@ bool DBfunctions::ResetGraph()
 
 bool DBfunctions::CreateMunicipalities() 
 {
+    
+    auto start_timer{std::chrono::steady_clock::now()};
+
     //TODO(NKC): implement error checking
     db_result_t municipalities = returnResult(conn_, "SELECT * FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
     
@@ -60,6 +66,7 @@ bool DBfunctions::CreateMunicipalities()
             //std::cout << current_region << " is not " << sub_municipality.at(2) << std::endl;
             current_region = sub_municipality.at(2);
             PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MERGE (:region {{name: '{}', region_code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(4), sub_municipality.at(2)).c_str());
+            PQclear(res);
         }
         if (current_city.compare(sub_municipality.at(1))) {
             sub_municipality_count = 1;
@@ -67,17 +74,29 @@ bool DBfunctions::CreateMunicipalities()
             current_city = sub_municipality.at(1);
             PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MERGE (:municipality {{name: '{}', code: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality.at(3), sub_municipality.at(1)).c_str());
             PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:region), (b:municipality) WHERE a.region_code = '{}' AND b.code = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(2), sub_municipality.at(1)).c_str());
+            PQclear(res);
+            PQclear(res1);
             
         }
         PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:sub_municipality {{name: '{}-{}', dk_municipalitykey: '{}'}}) $$) as (n agtype)", graph_name_, sub_municipality_count, sub_municipality.at(3), sub_municipality.at(0)).c_str());
         PGresult* res1 = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ MATCH (a:municipality), (b:sub_municipality) WHERE a.code = '{}' AND b.dk_municipalitykey = '{}' CREATE (a)-[e:contains]->(b) RETURN e $$) as (e agtype)", graph_name_, sub_municipality.at(1), sub_municipality.at(0)).c_str());
+        PQclear(res);
+        PQclear(res1);
         
         sub_municipality_count += 1;
     }
+    
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed2.count() <<" seconds" << std::endl;
+
     return true;
 }
 
 bool DBfunctions::CreateNodesForAllSubMunicipalities() {
+    
+    auto start_timer{std::chrono::steady_clock::now()};
+
     db_result_t municipalities = returnResult(conn_, "SELECT dk_municipalitykey FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
     std::map<std::string,Segment> segment_map; 
     for (const auto& sub_municipality : municipalities) {
@@ -111,7 +130,7 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities() {
         switch (data.municipality_keys.size())
         {
         case 1:
-            PQexec(conn_, std::format(
+            PQclear(PQexec(conn_, std::format(
                 "SELECT * FROM cypher('{}', $$ "
                 "MATCH (a:sub_municipality) "
                 "WHERE a.dk_municipalitykey = '{}' "
@@ -125,10 +144,10 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities() {
                 data.category, 
                 data.direction, 
                 data.name
-            ).c_str());
+            ).c_str()));
             break;
         case 2:
-            PQexec(conn_, std::format(
+            PQclear(PQexec(conn_, std::format(
                 "SELECT * FROM cypher('{}', $$ "
                 "MATCH (a:sub_municipality), (b:sub_municipality) "
                 "WHERE a.dk_municipalitykey = '{}' AND b.dk_municipalitykey = '{}' "
@@ -144,10 +163,10 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities() {
                 data.category, 
                 data.direction, 
                 data.name
-            ).c_str());
+            ).c_str()));
             break;
         case 3:
-            PQexec(conn_, std::format(
+            PQclear(PQexec(conn_, std::format(
                 "SELECT * FROM cypher('{}', $$ "
                 "MATCH (a:sub_municipality), (b:sub_municipality), (c:sub_municipality) "
                 "WHERE a.dk_municipalitykey = '{}' AND b.dk_municipalitykey = '{}' AND c.dk_municipalitykey = '{}' "
@@ -164,7 +183,7 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities() {
                 data.category,
                 data.direction,
                 data.name
-            ).c_str());
+            ).c_str()));
             break;
         default:
             std::cerr << "Unhandled size " << data.municipality_keys.size() << std::endl;
@@ -189,6 +208,68 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities() {
         }
         */
     }
+    
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed2.count() <<" seconds" << std::endl;
+
+    return true;
+}
+
+bool DBfunctions::CreateEdgesForAllSegments(){
+    
+    auto start_timer{std::chrono::steady_clock::now()};
+
+    PQclear(PQexec(conn_, "BEGIN"));
+
+    for(int i=303;i<311;i++){
+        PGresult* resBB = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
+        "WHERE a.segmentkey <> b.segmentkey and (a.startpoint = b.startpoint or a.startpoint = b.endpoint or a.endpoint = b.startpoint or a.endpoint = b.endpoint) "
+        "CREATE (a)-[c:connected_to]->(b) "
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+
+        PGresult* resBF = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
+        "WHERE a.startpoint = b.startpoint or a.endpoint = b.startpoint "
+        "MERGE (a)-[c:connected_to]->(b) "
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+
+        PGresult* resFB = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
+        "WHERE a.endpoint = b.startpoint or a.endpoint = b.endpoint "
+        "MERGE (a)-[c:connected_to]->(b) "
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+
+        PGresult* resFF = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
+        "WHERE a.endpoint = b.startpoint "
+        "CREATE (a)-[c:connected_to]->(b) "
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+
+        if(PQresultStatus(resBB) != PGRES_TUPLES_OK || PQresultStatus(resBF) != PGRES_TUPLES_OK || PQresultStatus(resFB) != PGRES_TUPLES_OK || PQresultStatus(resFF) != PGRES_TUPLES_OK){
+            std::cerr << "CreateEdgesForAllSegments() Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
+            PQclear(resBB);
+            PQclear(resBF);
+            PQclear(resFB);
+            PQclear(resFF);
+            
+            PQclear(PQexec(conn_, "ROLLBACK"));
+            return false; 
+        }
+        
+        PQclear(resBB);
+        PQclear(resBF);
+        PQclear(resFB);
+        PQclear(resFF);
+    }
+
+    PQclear(PQexec(conn_, "COMMIT"));
+
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
+    std::cout<< "add_edges() took: " << time_elapsed2.count() <<" seconds" << std::endl;
+
     return true;
 }
 

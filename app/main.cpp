@@ -22,6 +22,7 @@ int main() {
 
     db.CreateMunicipalities();
     db.CreateNodesForAllSubMunicipalities();
+    db.CreateEdgesForAllSegments();
 
 /*
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
