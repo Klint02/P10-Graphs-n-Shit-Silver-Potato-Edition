@@ -62,6 +62,8 @@ private:
     bool CreateEdgesForAllIntersections();
     std::string escape_quotes(std::string s);
     bool BenchmarkQuery(std::string benchmark_name, const std::string query);
+    bool CreateTrajectories();
+    bool CreateEdgesForTrajectoriesToSegments();
 };
 
 struct Trip_row {
