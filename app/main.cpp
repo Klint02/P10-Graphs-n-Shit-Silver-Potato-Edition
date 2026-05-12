@@ -19,7 +19,8 @@ int main() {
     const std::string graph_name = graph_prefix + "segment_as_nodes_graph";
 
     DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
-
+    
+    db.ResetGraph();
     db.CreateMunicipalities();
     db.CreateNodesForAllSubMunicipalities();
     db.CreateEdgesForAllSegments();
