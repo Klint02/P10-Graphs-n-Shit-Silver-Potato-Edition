@@ -218,21 +218,21 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities()
         */
     }
     
-    auto finish{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed{finish-start_timer};
-    std::cout<< "CreateNodesForAllSubMunicipalities() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
+    std::cout<< "CreateNodesForAllSubMunicipalities() took: " << time_elapsed2.count() <<" seconds" << std::endl;
 
     return true;
 }
 
 bool DBfunctions::CreateEdgesForAllSegments(){
     
-    auto start_timer{std::chrono::steady_clock::now()};
-
+    auto function_start_timer{std::chrono::steady_clock::now()};
     PQclear(PQexec(conn_, "BEGIN"));
+    db_result_t municipalities = returnResult(conn_, "SELECT dk_municipalitykey FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
 
-    for(int i=303;i<311;i++){
-        std::cout << i << std::endl;
+    for(const auto& municipality : municipalities) {
+        std::cout << municipality.at(0) << std::endl;
         
         auto start_timer2{std::chrono::steady_clock::now()};
 
@@ -240,7 +240,7 @@ bool DBfunctions::CreateEdgesForAllSegments(){
         "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
         "WHERE a.segmentkey <> b.segmentkey and (a.startpoint = b.startpoint or a.startpoint = b.endpoint or a.endpoint = b.startpoint or a.endpoint = b.endpoint) "
         "CREATE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
         
         if(PQresultStatus(resBB) != PGRES_TUPLES_OK){
             std::cerr << "Query for BOTH->BOTH Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
@@ -258,7 +258,7 @@ bool DBfunctions::CreateEdgesForAllSegments(){
         "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
         "WHERE a.startpoint = b.startpoint or a.endpoint = b.startpoint "
         "MERGE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
 
         if(PQresultStatus(resBF) != PGRES_TUPLES_OK){
             std::cerr << "Query for BOTH->FORWARD Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
@@ -276,7 +276,7 @@ bool DBfunctions::CreateEdgesForAllSegments(){
         "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
         "WHERE a.endpoint = b.startpoint or a.endpoint = b.endpoint "
         "MERGE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
         
         if(PQresultStatus(resFB) != PGRES_TUPLES_OK){
             std::cerr << "Query for FORWARD->BOTH Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
@@ -294,7 +294,7 @@ bool DBfunctions::CreateEdgesForAllSegments(){
         "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
         "WHERE a.endpoint = b.startpoint "
         "CREATE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, i, i).c_str());
+        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
 
         if(PQresultStatus(resFF) != PGRES_TUPLES_OK){
             std::cerr << "Query for FORWARD->FORWARD Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
@@ -316,9 +316,9 @@ bool DBfunctions::CreateEdgesForAllSegments(){
 
     PQclear(PQexec(conn_, "COMMIT"));
 
-    auto finish{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed{finish-start_timer};
-    std::cout<< "CreateEdgesForAllSegments() took: " << time_elapsed.count() <<" seconds" << std::endl;
+    auto finish2{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed2{finish2-function_start_timer};
+    std::cout<< "CreateEdgesForAllSegments() took: " << time_elapsed2.count() <<" seconds" << std::endl;
 
     return true;
 }
