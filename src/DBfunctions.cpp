@@ -379,7 +379,6 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
 {
     auto start_timer{std::chrono::steady_clock::now()};
     
-    
     // Map creation for segments
     std::unordered_map<int, long> segment_map;
 
@@ -395,11 +394,7 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
     }
 
     int segment_rows = PQntuples(segment_result);
-    std::cout << segment_rows << std::endl;
-    auto counts=0;
     for (int i = 0; i < segment_rows; i++) {
-        // if (counts%1000==0) std::cout<<counts<<std::endl;
-        // counts++;
         std::string temp = PQgetvalue(segment_result, i, 0);
         if(temp.front() == '"'){
             temp.erase(temp.begin());
@@ -429,25 +424,34 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
     }
 
     int trajectory_rows = PQntuples(trajectory_result);
-    std::cout << "Number of trajectories: " << trajectory_rows << std::endl;
-    auto countt=0;
-    int sum=0;
+    // std::cout << "Number of trajectories: " << trajectory_rows << std::endl;
     auto query_time_sum=0.0;
-    int lowest=100;
+    int lowest=10000;
     int largest=100;
-    const size_t BATCH_SIZE = 100;
+    const size_t BATCH_SIZE = 200;
+    const size_t EDGE_CREATION_CUTOFF = 4000;
     
     for (int b = 0; b < trajectory_rows; b+=BATCH_SIZE){
+        std::string start = std::format("SELECT * FROM cypher('{}', $$ unwind [", graph_name_);
+        std::string middle="";
+        std::string end = "] AS row "
+        "MATCH (t:trajectory) "
+        "WHERE id(t) = row.trajectory_vertex_id "
+        "MATCH (s:segment) "
+        "WHERE id(s) = row.segment_vertex_id "
+        "CREATE (t)-[u:uses]->(s) "
+        "SET u.occurrance_array = row.occurrance_array "
+        "$$) as (n agtype);";
+
+        std::cout << "Traject id's from " << b << " to " << b+BATCH_SIZE << std::endl;
+        auto number_of_connections = 0;
+
         for (int j = b; j < b+BATCH_SIZE && j<trajectory_rows; j++) {
-            if (countt%1==0) std::cout << "Trajectory number: " << countt << std::endl;
-            countt++;
-    
             std::string temp = PQgetvalue(trajectory_result, j, 0);
             if(temp.front() == '"'){
                 temp.erase(temp.begin());
             }
             int trajectory_id = std::stoi(temp);
-            std::cout << "Traject id: " << trajectory_id << std::endl;
             long trajectory_vertex_id = std::stol(PQgetvalue(trajectory_result, j, 1));
             trajectory_map_graph_id[trajectory_id] = trajectory_vertex_id;
     
@@ -466,42 +470,15 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
             }
     
             trajectory_map_segment_array[trajectory_id] = segment_array;
-    
-            
+            number_of_connections += trajectory_map_segment_array[trajectory_id].size();
+
             std::unordered_map<int,std::vector<int>> occurrance_array;
             int count=0;
     
-            std::cout << "Number of segments: " << trajectory_map_segment_array[trajectory_id].size()<<std::endl;
             for(int segment_key : trajectory_map_segment_array[trajectory_id]){
                 count++;
                 occurrance_array[segment_key].push_back(count);
             }
-            sum+=count;
-            if(count<lowest) lowest=count;
-            if(count>largest) largest=count;
-            
-            std::string start = std::format("SELECT * FROM cypher('{}', $$ unwind [", graph_name_);
-            std::string middle="";
-            std::string end = std::format("] AS row "
-            "MATCH (t:trajectory) "
-            "WHERE id(t) = {} "
-            "MATCH (s:segment) "
-            "WHERE id(s) = row.segmentvertexid "
-            "CREATE (t)-[u:uses]->(s) "
-            "SET u.occurrance_array = row.occurrance_array "
-            "$$) as (n agtype);", trajectory_map_graph_id[trajectory_id]);
-            // std::string end = std::format("] AS row "
-            // "MATCH (t:trajectory{{id:'{}'}}) "
-            // "MATCH (s:segment{{segmentkey:row.segmentkey}}) "
-            // "CREATE (t)-[u:uses]->(s) "
-            // "SET u.occurrance_array = row.occurrance_array "
-            // "$$) as (n agtype);", trajectory_id);
-            // std::string end = std::format("] AS row "
-            // "MATCH (t:trajectory), (s:segment{{segmentkey:row.segmentkey}}) "
-            // "WHERE id(t) = {} "
-            // "CREATE (t)-[u:uses]->(s) "
-            // "SET u.occurrance_array = row.occurrance_array "
-            // "$$) as (n agtype);", trajectory_map_graph_id[trajectory_id]);
             
             for(int segment_key : trajectory_map_segment_array[trajectory_id]){
                 if(*(occurrance_array[segment_key].end()-1)==-1) continue;
@@ -513,39 +490,43 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
                 if (occurrance_string.back() == ',') occurrance_string.pop_back();
                 occurrance_string += "]";
     
-                // middle+=std::format("{{segmentkey: '{}', occurrance_array: {}}},", segment_key, occurrance_string);
-                // middle+=std::format("{{segmentvertextid: '{}'}},", segment_map[segment_key]);
-                middle+=std::format("{{segmentvertexid: {}, occurrance_array: {}}},", segment_map[segment_key], occurrance_string);
-                // std::cout<<"Segmentkey: "<<segment_key<<", segment_map: "<<segment_map[segment_key]<<std::endl;
+                middle+=std::format("{{trajectory_vertex_id: {}, segment_vertex_id: {}, occurrance_array: {}}},", trajectory_map_graph_id[trajectory_id], segment_map[segment_key], occurrance_string);
                 occurrance_array[segment_key].push_back(-1);
             }
-            if (middle.back() == ',') middle.pop_back();
-    
-            std::string query = start + middle + end;
-            if(trajectory_id==35) std::cout<<query<<std::endl;
-    
-            auto start_query_time{std::chrono::steady_clock::now()};
-            
-            PGresult* res= PQexec(conn_, query.c_str());    
-            if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-                std::cerr << "CreateEdgesForTrajectoriesToSegments() failed: " << PQerrorMessage(conn_) << std::endl;
-                PQclear(res);
-                return false;
+            if(number_of_connections>EDGE_CREATION_CUTOFF) {
+                b=j+1-BATCH_SIZE;
+                break;
             }
-            
-            auto finish_query_time{std::chrono::steady_clock::now()};
-            std::chrono::duration<double> query_time_elapsed{finish_query_time-start_query_time};
-        
-            std::cout<< "It took query " << query_time_elapsed.count() <<" seconds to compute." << std::endl;
-            query_time_sum+=query_time_elapsed.count();
-            std::cout<<query_time_sum<<std::endl;
-            PQclear(res);
         }
+        if (middle.back() == ',') middle.pop_back();
+
+        std::string query = start + middle + end;
+
+        std::cout << "Number of edges between trajectory and segment: " << number_of_connections << std::endl;
+        if(number_of_connections<lowest) lowest=number_of_connections;
+        if(number_of_connections>largest) largest=number_of_connections;
+        
+        auto start_query_time{std::chrono::steady_clock::now()};
+        
+        PGresult* res= PQexec(conn_, query.c_str());    
+        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+            std::cerr << "CreateEdgesForTrajectoriesToSegments() failed: " << PQerrorMessage(conn_) << std::endl;
+            PQclear(res);
+            return false;
+        }
+        
+        auto finish_query_time{std::chrono::steady_clock::now()};
+        std::chrono::duration<double> query_time_elapsed{finish_query_time-start_query_time};
+    
+        std::cout<< "It took query " << query_time_elapsed.count() <<" seconds to compute." << std::endl;
+        query_time_sum+=query_time_elapsed.count();
+        std::cout << "Seconds since begun: " << query_time_sum << std::endl;
+
+        PQclear(res);
     }
 
     PQclear(trajectory_result);
     
-    std::cout << "Total number edges created: " << sum << std::endl;
     std::cout<<"Lowest: "<<lowest<<", largest: "<<largest<<std::endl;
     
     auto finish{std::chrono::steady_clock::now()};
