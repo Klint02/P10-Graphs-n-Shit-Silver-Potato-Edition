@@ -379,19 +379,19 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
 {
     auto start_timer{std::chrono::steady_clock::now()};
     
-    // Map creation for segments
-    std::unordered_map<int, long> segment_map;
-
     PGresult* segment_result = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-    "MATCH (s:segment) "
-    "RETURN s.segmentkey, id(s) "
-    "$$) AS (segmentkey agtype, segment_vertex_id agtype);", graph_name_).c_str());
+    "MATCH (su:sub_municipality)-[:contains]->(s:segment) "
+    "RETURN s.segmentkey, id(s), su.dk_municipalitykey "
+    "$$) AS (segmentkey agtype, segment_vertex_id agtype, municipalitykey agtype);", graph_name_).c_str());
 
     if(PQresultStatus(segment_result) != PGRES_TUPLES_OK){
         std::cerr << "Query for segment id and table location failed to execute. " << PQerrorMessage(conn_) << std::endl;
         PQclear(segment_result);
         return false; 
     }
+
+    std::unordered_map<int, long> segment_map;
+    std::unordered_map<int, int> sub_municipality_map;
 
     int segment_rows = PQntuples(segment_result);
     for (int i = 0; i < segment_rows; i++) {
@@ -402,6 +402,13 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
         int segment_key = std::stoi(temp);
         long segment_vertex_id = std::stol(PQgetvalue(segment_result, i, 1));
         segment_map[segment_key] = segment_vertex_id;
+        
+        std::string temp2 = PQgetvalue(segment_result, i, 2);
+        if(temp2.front() == '"'){
+            temp2.erase(temp2.begin());
+        }
+        int sub_municipality_key = std::stoi(temp2);
+        sub_municipality_map[segment_key] = sub_municipality_key;
     }
 
     PQclear(segment_result);
@@ -437,7 +444,7 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
         std::string end = "] AS row "
         "MATCH (t:trajectory) "
         "WHERE id(t) = row.trajectory_vertex_id "
-        "MATCH (s:segment) "
+        "MATCH (su:sub_municipality {dk_municipalitykey: row.dk_municipalitykey})-[:contains]->(s:segment) "
         "WHERE id(s) = row.segment_vertex_id "
         "CREATE (t)-[u:uses]->(s) "
         "SET u.occurrance_array = row.occurrance_array "
@@ -490,7 +497,7 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
                 if (occurrance_string.back() == ',') occurrance_string.pop_back();
                 occurrance_string += "]";
     
-                middle+=std::format("{{trajectory_vertex_id: {}, segment_vertex_id: {}, occurrance_array: {}}},", trajectory_map_graph_id[trajectory_id], segment_map[segment_key], occurrance_string);
+                middle+=std::format("{{trajectory_vertex_id: {}, segment_vertex_id: {}, dk_municipalitykey: '{}', occurrance_array: {}}},", trajectory_map_graph_id[trajectory_id], segment_map[segment_key], sub_municipality_map[segment_key], occurrance_string);
                 occurrance_array[segment_key].push_back(-1);
             }
             if(number_of_connections>EDGE_CREATION_CUTOFF) {
@@ -501,6 +508,7 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
         if (middle.back() == ',') middle.pop_back();
 
         std::string query = start + middle + end;
+        // std::cout<<query<<std::endl;
 
         std::cout << "Number of edges between trajectory and segment: " << number_of_connections << std::endl;
         if(number_of_connections<lowest) lowest=number_of_connections;
