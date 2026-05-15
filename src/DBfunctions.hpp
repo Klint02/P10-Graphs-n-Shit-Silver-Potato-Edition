@@ -39,6 +39,7 @@ private:
         std::string category;
         std::string direction;
         std::string name;
+        std::string point;
         std::vector<std::string> municipality_keys;
     };
     
@@ -54,4 +55,7 @@ public:
     bool CreateMunicipalities();
     bool CreateNodesForAllSubMunicipalities();
     bool CreateEdgesForAllSegments();
+    bool CreateNodesForAllStartAndEndpoints();
+    bool CreateEdgesForAllIntersections();
+    std::string escape_quotes(std::string s);
 };
