@@ -30,7 +30,6 @@ class DBfunctions
 private:
     PGconn* conn_;
     PGresult* res_;
-    const std::string graph_name_;
     struct Segment {
         public:
         std::string segmentkey;
@@ -43,7 +42,8 @@ private:
         std::vector<std::string> municipality_keys;
     };
     
-public:
+    public:
+    const std::string graph_name_;
     DBfunctions(const std::string& host,
                 const std::string& port,
                 const std::string& dbname,
@@ -58,4 +58,5 @@ public:
     bool CreateNodesForAllStartAndEndpoints();
     bool CreateEdgesForAllIntersections();
     std::string escape_quotes(std::string s);
+    bool BenchmarkQuery(std::string benchmark_name, const std::string query);
 };

@@ -4,6 +4,8 @@
 #include <set>
 #include <sstream>
 #include <format>
+#include <iostream>
+#include <fstream>
 
 #include <unordered_set>
 
@@ -320,6 +322,29 @@ bool DBfunctions::CreateEdgesForAllSegments(){
     std::chrono::duration<double> time_elapsed2{finish2-function_start_timer};
     std::cout<< "CreateEdgesForAllSegments() took: " << time_elapsed2.count() <<" seconds" << std::endl;
 
+    return true;
+}
+
+bool DBfunctions::BenchmarkQuery(std::string benchmark_name, const std::string query) {
+    std::cout<< benchmark_name <<" running: \n" << query << std::endl;
+
+    auto function_start_timer{std::chrono::steady_clock::now()};
+    std::ofstream output;
+    output.open (benchmark_name + ".csv");
+    db_result_t res = returnResult(conn_, query.c_str());
+
+    for (const auto& row : res) {
+        for (const auto& col : row) {
+            output << col << ",";
+        }
+        output << "\n";
+    }
+    output.close();
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-function_start_timer};
+    std::cout<< benchmark_name <<" took: " << time_elapsed.count() <<" seconds" << std::endl;
+    
     return true;
 }
 
@@ -836,6 +861,8 @@ bool insert_segments_as_edges(PGconn *conn, const db_result_t &data, const std::
 
     return true;
 }
+
+
 
 std::string DBfunctions::escape_quotes(std::string s)
 {
