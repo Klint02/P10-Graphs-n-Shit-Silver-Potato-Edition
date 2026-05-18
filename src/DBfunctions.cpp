@@ -27,6 +27,7 @@ DBfunctions::DBfunctions(const std::string &host,
     case CONNECTION_OK:
         std::cout << "Connection to postgres succesful" << std::endl; 
         //Declares search path for apache age
+        PQclear(PQexec(conn_, R"(LOAD 'age';)"));
         res_ = PQexec(conn_, R"(set search_path = ag_catalog, "$user", public;)"); 
         PQclear(res_);  
         break;
@@ -489,6 +490,7 @@ bool DBfunctions::CreateEdgesForAllIntersections()
 
         middle = "";
 
+        std::cout<<"datasize: "<<data.size()<<std::endl;
         if (!data.empty())
         {
 
@@ -515,6 +517,7 @@ bool DBfunctions::CreateEdgesForAllIntersections()
                               i, i);
 
             query = start + middle + end;
+            // std::cout<<query<<std::endl;
             resB = PQexec(conn_, query.c_str());
 
             if (PQresultStatus(resB) != PGRES_TUPLES_OK)
@@ -536,6 +539,8 @@ bool DBfunctions::CreateEdgesForAllIntersections()
         data = returnResult(conn_, std::format("select segmentkey, startpoint, endpoint, category, direction, name FROM experiments.data_for_graph WHERE ST_Intersects( segmentgeo::geometry, (SELECT ST_Union(geog::geometry) FROM regions.dk_municipalities WHERE dk_municipalitykey in ({}))) AND direction = 'FORWARD'", i).c_str());
 
         middle = "";
+
+        std::cout<<"datasize: "<<data.size()<<std::endl;
 
         if (!data.empty())
         {
@@ -590,6 +595,322 @@ bool DBfunctions::CreateEdgesForAllIntersections()
 
     return true;
 }
+
+
+bool DBfunctions::CreateTrajectories() 
+{
+    auto start_timer{std::chrono::steady_clock::now()};
+    
+    //TODO(CLM): Find a faster way to include geo_trip. Current way (commented out) is 5 times slower due to inner join.
+    db_result_t trajectories = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trajectory_duration, ARRAY_AGG(seconds) as segment_duration "
+                                            "FROM mapmatched_data.viterbi_match_osm_dk_20140101 "
+                                            "GROUP BY trip_id");
+    // db_result_t trajectories = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(trip.segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trajectory_duration, ARRAY_AGG(seconds) as segment_duration, ST_Union(segmentgeo::geometry) as geo_trajectory "
+    //                                         "FROM(SELECT trip_id, segmentkey, meters_driven, seconds "
+    //                                         "FROM mapmatched_data.viterbi_match_osm_dk_20140101) trip "
+    //                                         "INNER JOIN (SELECT segmentkey, segmentgeo "
+    //                                         "FROM maps.osm_dk_20140101) segmentmap "
+    //                                         "ON trip.segmentkey = segmentmap.segmentkey "
+    //                                         "GROUP BY trip_id");
+
+    std::cout << trajectories.size() << std::endl;
+
+    PQclear(PQexec(conn_, "BEGIN"));
+
+    auto count = 0;
+    for(auto trajectory : trajectories){
+        if(count%1000==0) std::cout << count << std::endl;
+        count++;
+
+        PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+            "CREATE (:trajectory {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}'}}) "
+            "$$) as (n agtype)", graph_name_, trajectory.at(0), trajectory.at(1), trajectory.at(2), trajectory.at(3), trajectory.at(4)).c_str());
+        // PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:trajectory {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}', geotrip: '{}'}}) $$) as (n agtype)", graph_name_, trajectory.at(0), trajectory.at(1), trajectory.at(2), trajectory.at(3), trajectory.at(4), trajectory.at(6)).c_str());
+        
+        if(PQresultStatus(res) != PGRES_TUPLES_OK){
+            std::cerr << "CreateTrajectories() Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
+            PQclear(res);
+            
+            PQclear(PQexec(conn_, "ROLLBACK"));
+            return false; 
+        }
+        
+        PQclear(res);
+    }
+
+    PQclear(PQexec(conn_, "COMMIT"));
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "It took CreateTrajectories() " << time_elapsed.count() <<" seconds to compute." << std::endl;
+        
+    return true;
+}
+
+bool DBfunctions::CreateTrajectoryConnectionForSAE() 
+{
+    auto start_timer{std::chrono::steady_clock::now()};
+    
+    
+    PGresult* trajectory_result = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+    "MATCH (t:trajectory) "
+    "RETURN t.id, id(t), t.segment_array "
+    "ORDER BY (t) "
+    "$$) AS (trajectory_id agtype, trajectory_vertex_id agtype, trajectory_segment_array agtype);", graph_name_).c_str());
+
+    if(PQresultStatus(trajectory_result) != PGRES_TUPLES_OK){
+        std::cerr << "Query for trajectories id, table location and segment array failed to execute. " << PQerrorMessage(conn_) << std::endl;
+        PQclear(trajectory_result);
+        return false; 
+    }
+    
+    std::vector<int> trajectory_ids;
+    std::unordered_map<int, long> trajectory_map_graph_id;
+    std::unordered_map<int, std::vector<int>> trajectory_map_segment_array;
+    int trajectory_row_count = PQntuples(trajectory_result);
+    
+    for(int t=0;t<trajectory_row_count;t++){
+        std::string temp = PQgetvalue(trajectory_result, t, 0);
+        if(temp.front() == '"'){
+            temp.erase(temp.begin());
+        }
+        int trajectory_id = std::stoi(temp);
+        trajectory_ids.push_back(trajectory_id);
+
+        long trajectory_vertex_id = std::stol(PQgetvalue(trajectory_result, t, 1));
+        trajectory_map_graph_id[trajectory_id] = trajectory_vertex_id;
+    
+        std::string temp2 = PQgetvalue(trajectory_result, t, 2);
+        temp2.erase(temp2.begin());
+        temp2.erase(temp2.begin());
+        temp2.pop_back();
+        temp2.pop_back();
+        
+        std::stringstream ss(temp2);
+        std::string arr_split;
+        std::vector<int> segment_array;
+        // std::cout<<"[";
+        while (std::getline(ss, arr_split, ',')){
+            segment_array.push_back(std::stoi(arr_split));
+            // std::cout<<arr_split<<",";
+        }
+        // std::cout<<"]"<<std::endl;
+    
+        trajectory_map_segment_array[trajectory_id] = segment_array;
+    }
+
+    PQclear(trajectory_result);
+
+    auto trajectory_map_finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> trajectory_map_time_elapsed{trajectory_map_finish-start_timer};
+    
+    std::cout << "Trajectory map finish. It took " << trajectory_map_time_elapsed.count() <<" seconds to compute." << std::endl;
+    
+
+
+    PGresult* intersection_result = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+    "MATCH ()-[se:segment]->(i) "
+    "RETURN se.segmentkey, id(i) "
+    "$$) AS (segmentkey agtype, intersection_vertex_id agtype);", graph_name_).c_str());
+
+    if(PQresultStatus(intersection_result) != PGRES_TUPLES_OK){
+        std::cerr << "Query for segmentkey and intersection vertex id failed to execute. " << PQerrorMessage(conn_) << std::endl;
+        PQclear(intersection_result);
+        return false; 
+    }
+
+    std::unordered_map<int, long> intersection_map;
+
+    int intersection_row_count = PQntuples(intersection_result);
+    for (int i = 0; i < intersection_row_count; i++) {
+        std::string temp = PQgetvalue(intersection_result, i, 0);
+        // std::cout<<temp<<std::endl;
+        if(temp.front() == '"'){
+            temp.erase(temp.begin());
+        }
+        int segment_key = std::stoi(temp);
+        long intersection_vertex_id = std::stol(PQgetvalue(intersection_result, i, 1));
+        // std::cout<<intersection_vertex_id<<std::endl;
+        intersection_map[segment_key] = intersection_vertex_id;
+    }
+
+    PQclear(intersection_result);
+    
+    auto intersection_map_finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> intersection_map_time_elapsed{intersection_map_finish-trajectory_map_finish};
+    
+    std::cout << "Intersection map finish. It took " << intersection_map_time_elapsed.count() <<" seconds to compute." << std::endl;
+
+
+
+    PGresult* municipality_result = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
+    "MATCH (sm:sub_municipality)-[:contains]->(i:intersection) "
+    "RETURN id(i), sm.dk_municipalitykey "
+    "$$) AS (intersection_vertex_id agtype, municipalitykey agtype);", graph_name_).c_str());
+    
+    if(PQresultStatus(municipality_result) != PGRES_TUPLES_OK){
+        std::cerr << "Query for intersection vertex id and municipalitykey failed to execute. " << PQerrorMessage(conn_) << std::endl;
+        PQclear(municipality_result);
+        return false; 
+    }
+
+    std::unordered_map<int, int> sub_municipality_map;
+
+    int municipality_row_count = PQntuples(municipality_result);
+    for (int m = 0; m < municipality_row_count; m++) {
+        long intersection_vertex_id = std::stol(PQgetvalue(municipality_result, m, 0));
+        // std::cout<<intersection_vertex_id<<std::endl;
+        
+        std::string temp = PQgetvalue(municipality_result, m, 1);
+        // std::cout<<temp<<std::endl;
+        if(temp.front() == '"'){
+            temp.erase(temp.begin());
+        }
+        int sub_municipality_key = std::stoi(temp);
+        sub_municipality_map[intersection_vertex_id] = sub_municipality_key;
+    }
+
+    PQclear(municipality_result);
+    
+    auto sub_municipality_map_finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> sub_municipality_map_time_elapsed{sub_municipality_map_finish-intersection_map_finish};
+    
+    std::cout << "Sub_municipality map finish. It took " << sub_municipality_map_time_elapsed.count() <<" seconds to compute." << std::endl;
+
+
+
+    auto query_time_sum=0.0;
+    const size_t BATCH_SIZE = 200;
+    const size_t EDGE_CREATION_CUTOFF = 4000;
+    for(int b = 0; b < trajectory_row_count; b+=BATCH_SIZE){
+    // for(int b = 0; b < 1; b+=BATCH_SIZE){
+        std::string start = std::format("SELECT * FROM cypher('{}', $$ unwind [", graph_name_);
+        std::string middle="";
+        std::string end = "] AS row "
+        "MATCH (t:trajectory) "
+        "WHERE id(t) = row.trajectory_internal_id "
+        "MATCH (su:sub_municipality {dk_municipalitykey: row.dk_municipalitykey})-[:contains]->(i:intersection) "
+        "WHERE id(i) = row.intersection_internal_id "
+        "CREATE (t)-[tc:TrajectoryConnection]->(i) "
+        "$$) as (n agtype);";
+
+        std::cout << "Traject id's from " << b << " to " << b+BATCH_SIZE << std::endl;
+
+        auto number_of_connections = 0;
+
+        for (int j = b; j < b+BATCH_SIZE && j<trajectory_row_count; j++) {
+        // for (int j = b; j < b+BATCH_SIZE && j<1; j++) {
+            std::unordered_map<int,std::vector<int>> occurrance_array;
+            int count=0;
+    
+            for(int segment_key : trajectory_map_segment_array[trajectory_ids.at(j)]){
+                count++;
+                occurrance_array[segment_key].push_back(count);
+            }
+            
+            for(int segment_key : trajectory_map_segment_array[trajectory_ids.at(j)]){
+                if(*(occurrance_array[segment_key].end()-1)==-1) continue;
+    
+                std::string occurrance_string = "[";
+                for(int occurrance : occurrance_array[segment_key]){
+                    occurrance_string += std::to_string(occurrance) + ",";
+                }
+                if (occurrance_string.back() == ',') occurrance_string.pop_back();
+                occurrance_string += "]";
+    
+                middle+=std::format("{{trajectory_internal_id: {}, intersection_internal_id: {}, dk_municipalitykey: '{}', occurrance_array: {}}},", 
+                    trajectory_map_graph_id[trajectory_ids.at(j)], 
+                    intersection_map[segment_key], 
+                    sub_municipality_map[intersection_map[segment_key]], 
+                    occurrance_string);
+                
+                // std::cout<<"traj id "<<trajectory_ids.at(j)<<std::endl;
+                // std::cout<<"traj internal "<<trajectory_map_graph_id[trajectory_ids.at(j)]<<std::endl;
+                // std::cout<<"segmentkey "<<segment_key<<std::endl;
+                // std::cout<<"point internal "<<intersection_map[segment_key]<<std::endl;
+                // std::cout<<"muni internal "<<sub_municipality_map[intersection_map[segment_key]]<<std::endl;
+                // std::cout<<"middle "<<middle<<std::endl;
+                // std::cout<<std::endl;
+                occurrance_array[segment_key].push_back(-1);
+            }
+
+            number_of_connections += trajectory_map_segment_array[trajectory_ids.at(j)].size();
+            if(number_of_connections>EDGE_CREATION_CUTOFF) {
+                b=j+1-BATCH_SIZE;
+                break;
+            }
+        }
+        if (middle.back() == ',') middle.pop_back();
+
+        std::string query = start + middle + end;
+        // std::cout<<query<<std::endl;
+
+        std::cout << "Number of edges between trajectory and segment: " << number_of_connections << std::endl;
+        
+        auto start_query_time{std::chrono::steady_clock::now()};
+        
+        PGresult* res = PQexec(conn_, query.c_str());    
+        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+            std::cerr << "CreateTrajectoryConnectionForSAE() failed: " << PQerrorMessage(conn_) << std::endl;
+            PQclear(res);
+            return false;
+        }
+        PQclear(res);
+        
+        auto finish_query_time{std::chrono::steady_clock::now()};
+        std::chrono::duration<double> query_time_elapsed{finish_query_time-start_query_time};
+    
+        std::cout<< "It took query " << query_time_elapsed.count() <<" seconds to compute." << std::endl;
+        query_time_sum+=query_time_elapsed.count();
+        std::cout << "Seconds since begun: " << query_time_sum << std::endl;
+    }
+
+    // for(int trajectory_id : trajectory_ids){
+    //     for(int segmentkey : trajectory_map_segment_array[trajectory_id]){
+    //         std::string trajectory_to_intersection = std::format("SELECT * FROM cypher('{}', $$ "
+    //         "MATCH (t:trajectory) "
+    //         "WHERE id(t) = {} "
+    //         "MATCH (su:sub_municipality {{dk_municipalitykey: {}}})-[:contains]->(i:intersection) "
+    //         "WHERE id(i) = {} "
+    //         "CREATE (t)-[tc:TrajectoryConnection]->(i) "
+    //         "$$) as (n agtype);"
+    //         , graph_name_, trajectory_map_graph_id[trajectory_id], sub_municipality_map[intersection_map[segmentkey]], intersection_map[segmentkey]);
+            
+    //         PGresult* res = PQexec(conn_, trajectory_to_intersection.c_str());    
+    //         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    //             std::cerr << "CreateTrajectoryConnectionForSAE() failed: " << PQerrorMessage(conn_) << std::endl;
+    //             PQclear(res);
+    //             return false;
+    //         }
+    //         PQclear(res);
+
+    //     }
+        
+    // }
+        
+    // for(i=1;i<segment_array.size();i++){
+    //     std::string start = std::format("SELECT * FROM cypher('{}', $$ unwind [", graph_name_);
+    //     std::string middle="";
+    //     std::string end = "] AS row "
+    //     "MATCH (t:trajectory) "
+    //     "WHERE id(t) = row.trajectory_vertex_id "
+    //     "MATCH (su:sub_municipality {dk_municipalitykey: row.dk_municipalitykey1})-[:contains]->(i1:intersection) "
+    //     "WHERE id(i1) = row.intersection_vertex_id_1 "
+    //     "MATCH ()-[se:segment]->(i1) "
+    //     "WHERE id(se) = row.segment_vertex_id "
+    //     "CREATE (t)-[tc:TrajectoryConnection]->(i1) "
+    //     "$$) as (n agtype);";
+    // }
+
+    auto finish{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed{finish-start_timer};
+
+    std::cout<< "It took CreateEdgesForTrajectoriesToSegments() " << time_elapsed.count() <<" seconds to compute." << std::endl;
+        
+    return true;
+}
+
 
 // function that returns data based on the query it gets.
 db_result_t returnResult(PGconn *conn, const char *query)

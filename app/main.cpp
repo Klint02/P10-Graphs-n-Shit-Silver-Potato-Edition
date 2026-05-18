@@ -17,14 +17,18 @@ int main() {
     const std::string username = config["database-user"].as<std::string>();
     const std::string password = config["password"].as<std::string>();
     const std::string graph_prefix = config["graph_prefix"].as<std::string>();
-    const std::string graph_name = graph_prefix + "segment_as_nodes_graph";
-    
+    const std::string graph_name = graph_prefix + "segment_as_edges_graph";
+
     DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
     
-    db.ResetGraph();
-    db.CreateMunicipalities();
-    db.CreateNodesForAllSubMunicipalities();
-    db.CreateEdgesForAllSegments();
+    // db.ResetGraph();
+    // db.CreateMunicipalities();
+    // db.CreateNodesForAllSubMunicipalities();
+    // db.CreateEdgesForAllSegments();
+    // db.CreateNodesForAllStartAndEndpoints();
+    // db.CreateEdgesForAllIntersections();
+    // db.CreateTrajectories();
+    db.CreateTrajectoryConnectionForSAE();
     */
 
 /*
