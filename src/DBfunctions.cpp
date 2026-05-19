@@ -710,9 +710,9 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
 
 
     PGresult* intersection_result = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-    "MATCH ()-[se:segment]->(i) "
-    "RETURN se.segmentkey, id(i) "
-    "$$) AS (segmentkey agtype, intersection_vertex_id agtype);", graph_name_).c_str());
+    "MATCH (i1)-[se:segment]->(i2) "
+    "RETURN se.segmentkey, id(i1), id(i2) "
+    "$$) AS (segmentkey agtype, intersection_vertex_id_1 agtype, intersection_vertex_id_2 agtype);", graph_name_).c_str());
 
     if(PQresultStatus(intersection_result) != PGRES_TUPLES_OK){
         std::cerr << "Query for segmentkey and intersection vertex id failed to execute. " << PQerrorMessage(conn_) << std::endl;
@@ -720,7 +720,7 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
         return false; 
     }
 
-    std::unordered_map<int, long> intersection_map;
+    std::unordered_map<int, std::vector<long>> intersection_map;
 
     int intersection_row_count = PQntuples(intersection_result);
     for (int i = 0; i < intersection_row_count; i++) {
@@ -729,10 +729,12 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
         if(temp.front() == '"'){
             temp.erase(temp.begin());
         }
-        int segment_key = std::stoi(temp);
-        long intersection_vertex_id = std::stol(PQgetvalue(intersection_result, i, 1));
-        // std::cout<<intersection_vertex_id<<std::endl;
-        intersection_map[segment_key] = intersection_vertex_id;
+        int segmentkey = std::stoi(temp);
+        if(intersection_map.find(segmentkey)!=intersection_map.end()) continue;
+
+        long intersection_vertex_id_1 = std::stol(PQgetvalue(intersection_result, i, 1));
+        long intersection_vertex_id_2 = std::stol(PQgetvalue(intersection_result, i, 2));
+        intersection_map[segmentkey] = {intersection_vertex_id_1,intersection_vertex_id_2};
     }
 
     PQclear(intersection_result);
@@ -782,9 +784,10 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
 
     auto query_time_sum=0.0;
     const size_t BATCH_SIZE = 200;
+    // const size_t BATCH_SIZE = 1;
     const size_t EDGE_CREATION_CUTOFF = 4000;
     for(int b = 0; b < trajectory_row_count; b+=BATCH_SIZE){
-    // for(int b = 0; b < 1; b+=BATCH_SIZE){
+    // for(int b = 0; b < 3; b+=BATCH_SIZE){
         std::string start = std::format("SELECT * FROM cypher('{}', $$ unwind [", graph_name_);
         std::string middle="";
         std::string end = "] AS row "
@@ -792,50 +795,79 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
         "WHERE id(t) = row.trajectory_internal_id "
         "MATCH (su:sub_municipality {dk_municipalitykey: row.dk_municipalitykey})-[:contains]->(i:intersection) "
         "WHERE id(i) = row.intersection_internal_id "
-        "CREATE (t)-[tc:TrajectoryConnection]->(i) "
+        "CREATE (t)-[tc:trajectory_connection]->(i) "
+        "SET tc.occurrence_array = row.occurrence_array "
         "$$) as (n agtype);";
 
         std::cout << "Traject id's from " << b << " to " << b+BATCH_SIZE << std::endl;
+        // std::cout << std::endl;
 
         auto number_of_connections = 0;
 
         for (int j = b; j < b+BATCH_SIZE && j<trajectory_row_count; j++) {
-        // for (int j = b; j < b+BATCH_SIZE && j<1; j++) {
-            std::unordered_map<int,std::vector<int>> occurrance_array;
-            int count=0;
-    
-            for(int segment_key : trajectory_map_segment_array[trajectory_ids.at(j)]){
-                count++;
-                occurrance_array[segment_key].push_back(count);
+        // for (int j = b; j < b+BATCH_SIZE && j<3; j++) {
+            auto segment_array = trajectory_map_segment_array[trajectory_ids.at(j)];
+            auto first_segment_points = intersection_map[segment_array[0]];
+            auto second_segment_points = intersection_map[segment_array[1]];
+            long end_point;
+
+            if(first_segment_points[0]==second_segment_points[0] || first_segment_points[0]==second_segment_points[1]){
+                end_point = first_segment_points[0];
+            } else if(first_segment_points[1]==second_segment_points[0] || first_segment_points[1]==second_segment_points[1]){
+                end_point = first_segment_points[1];
+            } else {
+                std::cerr << "CreateTrajectoryConnectionForSAE() failed: First and second segment not connected." << std::endl;
+                return false;
             }
             
-            for(int segment_key : trajectory_map_segment_array[trajectory_ids.at(j)]){
-                if(*(occurrance_array[segment_key].end()-1)==-1) continue;
-    
-                std::string occurrance_string = "[";
-                for(int occurrance : occurrance_array[segment_key]){
-                    occurrance_string += std::to_string(occurrance) + ",";
+            std::unordered_map<long,std::vector<int>> intersection_occurrence_array;
+            int segmentkey_counter=1;
+            intersection_occurrence_array[end_point].push_back(segmentkey_counter);
+            
+            // std::cout<<"0: "<<intersection_map[segment_array[0]][0]<<","<<intersection_map[segment_array[0]][1]<<std::endl;
+            for (int s = 1; s < segment_array.size()-1; s++){
+                // std::cout<<s<<": "<<intersection_map[segment_array[s]][0]<<","<<intersection_map[segment_array[s]][1]<<std::endl;
+                segmentkey_counter++;
+                if(end_point == intersection_map[segment_array[s]][0]){
+                    end_point = intersection_map[segment_array[s]][1];
+                    intersection_occurrence_array[end_point].push_back(segmentkey_counter);
+                } else if(end_point == intersection_map[segment_array[s]][1]){
+                    end_point = intersection_map[segment_array[s]][0];
+                    intersection_occurrence_array[end_point].push_back(segmentkey_counter);
                 }
-                if (occurrance_string.back() == ',') occurrance_string.pop_back();
-                occurrance_string += "]";
+            }
+
+            for (const auto& [intersection_key, occurrence_array] : intersection_occurrence_array){
+                // std::cout<<intersection_key<<std::endl;
+                // for(int occurrence : occurrence_array){
+                //     std::cout<<occurrence<<",";
+                // }
+                // std::cout<<std::endl;
+
+                
+                std::string occurrence_string = "[";
+                for(int occurrence : occurrence_array){
+                    occurrence_string += std::to_string(occurrence) + ",";
+                }
+                if (occurrence_string.back() == ',') occurrence_string.pop_back();
+                occurrence_string += "]";
     
-                middle+=std::format("{{trajectory_internal_id: {}, intersection_internal_id: {}, dk_municipalitykey: '{}', occurrance_array: {}}},", 
+                middle+=std::format("{{trajectory_internal_id: {}, intersection_internal_id: {}, dk_municipalitykey: '{}', occurrence_array: {}}},", 
                     trajectory_map_graph_id[trajectory_ids.at(j)], 
-                    intersection_map[segment_key], 
-                    sub_municipality_map[intersection_map[segment_key]], 
-                    occurrance_string);
+                    intersection_key, 
+                    sub_municipality_map[intersection_key], 
+                    occurrence_string);
                 
                 // std::cout<<"traj id "<<trajectory_ids.at(j)<<std::endl;
                 // std::cout<<"traj internal "<<trajectory_map_graph_id[trajectory_ids.at(j)]<<std::endl;
-                // std::cout<<"segmentkey "<<segment_key<<std::endl;
-                // std::cout<<"point internal "<<intersection_map[segment_key]<<std::endl;
-                // std::cout<<"muni internal "<<sub_municipality_map[intersection_map[segment_key]]<<std::endl;
+                // std::cout<<"point internal "<<intersection_key<<std::endl;
+                // std::cout<<"muni internal "<<sub_municipality_map[intersection_key]<<std::endl;
+                // std::cout<<"occurrence "<<occurrence_string<<std::endl;
                 // std::cout<<"middle "<<middle<<std::endl;
                 // std::cout<<std::endl;
-                occurrance_array[segment_key].push_back(-1);
             }
 
-            number_of_connections += trajectory_map_segment_array[trajectory_ids.at(j)].size();
+            number_of_connections += segment_array.size();
             if(number_of_connections>EDGE_CREATION_CUTOFF) {
                 b=j+1-BATCH_SIZE;
                 break;
