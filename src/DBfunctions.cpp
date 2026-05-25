@@ -326,7 +326,7 @@ bool DBfunctions::CreateEdgesForAllSegments(){
 }
 
 bool DBfunctions::BenchmarkQuery(std::string benchmark_name, const std::string query) {
-    std::cout<< benchmark_name <<" running: \n" << query << std::endl;
+    std::cout<< benchmark_name <<" running:" /*<< query*/ << std::endl;
 
     auto function_start_timer{std::chrono::steady_clock::now()};
     std::ofstream output;
@@ -344,6 +344,7 @@ bool DBfunctions::BenchmarkQuery(std::string benchmark_name, const std::string q
     auto finish{std::chrono::steady_clock::now()};
     std::chrono::duration<double> time_elapsed{finish-function_start_timer};
     std::cout<< benchmark_name <<" took: " << time_elapsed.count() <<" seconds" << std::endl;
+    std::cout<<std::endl;
     
     return true;
 }
@@ -587,7 +588,8 @@ db_result_t returnResult(PGconn *conn, const char *query)
 
     // Checks if the query went through otherwise gives an error.
     PGresult *res = PQexec(conn, query);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK)
+    if (PQresultStatus(res) != PGRES_TUPLES_OK &&
+    PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         std::cerr << "Query failed: " << PQerrorMessage(conn) << std::endl;
         PQclear(res);

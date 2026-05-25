@@ -28,7 +28,7 @@ bool add_edges(PGconn* conn, db_result_t& data);
 class DBfunctions
 {
 private:
-    PGconn* conn_;
+    
     PGresult* res_;
     struct Segment {
         public:
@@ -43,6 +43,7 @@ private:
     };
     
     public:
+    PGconn* conn_;
     const std::string graph_name_;
     DBfunctions(const std::string& host,
                 const std::string& port,
@@ -51,6 +52,7 @@ private:
                 const std::string& password,
                 const std::string& graph_prefix,
                 const std::string& graph_name);
+
     bool ResetGraph();
     bool CreateMunicipalities();
     bool CreateNodesForAllSubMunicipalities();
