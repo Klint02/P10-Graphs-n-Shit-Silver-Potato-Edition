@@ -225,105 +225,6 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities()
     return true;
 }
 
-bool DBfunctions::CreateEdgesForAllSegments(){
-    
-    auto function_start_timer{std::chrono::steady_clock::now()};
-    PQclear(PQexec(conn_, "BEGIN"));
-    db_result_t municipalities = returnResult(conn_, "SELECT dk_municipalitykey FROM regions.dk_municipalities ORDER BY dk_municipalitykey");
-
-    for(const auto& municipality : municipalities) {
-        std::cout << municipality.at(0) << std::endl;
-        
-        auto start_timer2{std::chrono::steady_clock::now()};
-
-        PGresult* resBB = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
-        "WHERE a.segmentkey <> b.segmentkey and (a.startpoint = b.startpoint or a.startpoint = b.endpoint or a.endpoint = b.startpoint or a.endpoint = b.endpoint) "
-        "CREATE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
-        
-        if(PQresultStatus(resBB) != PGRES_TUPLES_OK){
-            std::cerr << "Query for BOTH->BOTH Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(resBB);
-                    
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false; 
-        }
-        
-        auto query1{std::chrono::steady_clock::now()};
-        std::chrono::duration<double> time_elapsed1{query1-start_timer2};
-        std::cout<< "BOTH->BOTH took: " << time_elapsed1.count() <<" seconds" << std::endl;
-
-        PGresult* resBF = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'BOTH'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
-        "WHERE a.startpoint = b.startpoint or a.endpoint = b.startpoint "
-        "MERGE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
-
-        if(PQresultStatus(resBF) != PGRES_TUPLES_OK){
-            std::cerr << "Query for BOTH->FORWARD Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(resBF);
-            
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false; 
-        }
-        
-        auto query2{std::chrono::steady_clock::now()};
-        std::chrono::duration<double> time_elapsed2{query2-query1};
-        std::cout<< "BOTH->FORWARD took: " << time_elapsed2.count() <<" seconds" << std::endl;
-
-        PGresult* resFB = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
-        "WHERE a.endpoint = b.startpoint or a.endpoint = b.endpoint "
-        "MERGE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
-        
-        if(PQresultStatus(resFB) != PGRES_TUPLES_OK){
-            std::cerr << "Query for FORWARD->BOTH Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(resFB);
-            
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false; 
-        }
-        
-        auto query3{std::chrono::steady_clock::now()};
-        std::chrono::duration<double> time_elapsed3{query3-query2};
-        std::cout<< "FORWARD->BOTH took: " << time_elapsed3.count() <<" seconds" << std::endl;
-
-        PGresult* resFF = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-        "MATCH (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: '{}'}})-[:contains]->(b:segment {{direction: 'FORWARD'}}) "
-        "WHERE a.endpoint = b.startpoint "
-        "CREATE (a)-[c:connected_to]->(b) "
-        "RETURN properties(a), c, properties(b) $$) as (a agtype, c agtype, b agtype);", graph_name_, municipality.at(0), municipality.at(0)).c_str());
-
-        if(PQresultStatus(resFF) != PGRES_TUPLES_OK){
-            std::cerr << "Query for FORWARD->FORWARD Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(resFF);
-            
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false; 
-        }
-        
-        auto query4{std::chrono::steady_clock::now()};
-        std::chrono::duration<double> time_elapsed4{query4-query3};
-        std::cout<< "FORWARD->FORWARD took: " << time_elapsed4.count() <<" seconds" << std::endl;
-        
-        PQclear(resBB);
-        PQclear(resBF);
-        PQclear(resFB);
-        PQclear(resFF);
-    }
-
-    PQclear(PQexec(conn_, "COMMIT"));
-
-    auto finish2{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed2{finish2-function_start_timer};
-    std::cout<< "CreateEdgesForAllSegments() took: " << time_elapsed2.count() <<" seconds" << std::endl;
-
-    return true;
-}
-
-
 bool DBfunctions::CreateTrajectories() 
 {
     auto start_timer{std::chrono::steady_clock::now()};
@@ -542,17 +443,6 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
 
     std::cout<< "It took CreateEdgesForTrajectoriesToSegments() " << time_elapsed.count() <<" seconds to compute." << std::endl;
         
-    return true;
-}
-
-
-//function that returns data based on the query it gets.
-db_result_t returnResult(PGconn* conn, const char* query){
-    
-    auto finish2{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed2{finish2-start_timer};
-    std::cout<< "CreateNodesForAllSubMunicipalities() took: " << time_elapsed2.count() <<" seconds" << std::endl;
-
     return true;
 }
 
