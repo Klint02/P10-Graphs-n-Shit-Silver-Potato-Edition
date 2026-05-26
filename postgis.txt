@@ -1,0 +1,84 @@
+nye queries:
+returner alle segmenter der kun er i en, to eller tre submunicipalities. Gør det samme for municipalities og regions
+
+-- 744911 9 sec
+SELECT * FROM cypher('production_segment_as_nodes_graph', $$
+MATCH (s:segment)<-[r:contains]-()
+WITH s, count(r) AS inContainsCount
+WHERE inContainsCount = 1
+RETURN s.segmentkey $$) as (s agtype);
+
+-- 744909 1m 50 sec
+"SELECT s.segmentkey, s.segmentgeo"
+"FROM experiments.data_for_graph s"
+"JOIN regions.dk_municipalities r ON ST_Intersects(r.geog, s.segmentgeo)"
+"GROUP BY s.segmentkey, s.segmentgeo"
+"HAVING COUNT(r.dk_municipalitykey) = 1;"
+
+returner alle segmenter indenfor radius eller område (ikke municipalities her)
+"SELECT *"
+"FROM experiments.data_for_graph"
+"WHERE ST_DWithin("
+  "segmentgeo::geography,"
+  "ST_SetSRID(ST_MakePoint(9.984202634948444, 57.01489256594891), 4326)::geography,"
+"  1000"
+");"
+
+Queries for postgis:
+
+	Q3: fetch_all_segments
+		SELECT * FROM experiments.data_for_graph;
+	
+	Q4: fetch_property
+		SELECT * FROM experiments.data_for_graph where name = 'Vesterbro';
+	
+	Q5: fetch_node_with_relations_out
+        "SELECT d2.*"
+        "FROM experiments.data_for_graph d1"
+        "JOIN experiments.data_for_graph d2"
+        "ON d1.endpoint = d2.startpoint or d1.startpoint = d2.startpoint"
+        "WHERE d1.segmentkey = 413648;"
+	
+    Q6: fetch_node_with_relations_in
+        "SELECT d2.*"
+        "FROM experiments.data_for_graph d1"
+        "JOIN experiments.data_for_graph d2"
+        "ON d1.startpoint = d2.endpoint or d1.endpoint = d2.endpoint"
+        "WHERE d1.segmentkey = 413648;"
+
+    Q7: fetch_node_with_relations_in_and_out
+        "SELECT d2.*"
+        "FROM experiments.data_for_graph d1"
+        "JOIN experiments.data_for_graph d2"
+        "ON d1.startpoint = d2.endpoint or d1.endpoint = d2.endpoint or d1.endpoint = d2.startpoint or d1.startpoint = d2.startpoint"
+        "WHERE d1.segmentkey = 413648;"
+
+    Q8: node_degree
+        "SELECT count(d2.*)"
+        "FROM experiments.data_for_graph d1"
+        "JOIN experiments.data_for_graph d2"
+        "ON d1.startpoint = d2.endpoint or d1.endpoint = d2.endpoint or d1.endpoint = d2.startpoint or d1.startpoint = d2.startpoint"
+        "WHERE d1.segmentkey = 413648;"
+
+    Q9: create_specific_shortcut
+        insert into experiments.shortcut values (1, 24774, 359481, 'dummy edge');
+
+
+Klint — 18.05.2026, 11.16
+SELECT * FROM cypher('chr1_segment_as_nodes_graph', $$ MATCH (t:trajectory)-[]->(s:segment {segmentkey: "125257"}) RETURN t.id $$) as (t agtype); 
+
+SELECT * FROM cypher('chr2_segment_as_edges_graph', $$ MATCH (t:trajectory)-[]->(i1:intersection {point: "126761"}), (t:trajectory)-[]->(i2:intersection {point: "126747"}) RETURN t.id, i1, i2 $$) as (t agtype, i1 agtype, i2 agtype); 
+
+
+SELECT trip_id, ST_Union(segmentgeo::geometry) as geo_trajectory
+FROM(SELECT trip_id, segmentkey, meters_driven, seconds
+FROM mapmatched_data.viterbi_match_osm_dk_20140101) trip
+INNER JOIN (SELECT segmentkey, segmentgeo
+FROM maps.osm_dk_20140101 where segmentkey = 125257) segmentmap
+ON trip.segmentkey = segmentmap.segmentkey
+GROUP BY trip_id
+
+
+//insert segment
+delete from experiments.data_for_graph where segmentkey = 23781;
+insert into experiments.data_for_graph values (values);

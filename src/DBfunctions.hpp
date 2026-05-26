@@ -28,12 +28,23 @@ bool add_edges(PGconn* conn, db_result_t& data);
 class DBfunctions
 {
 private:
-    PGconn* conn_;
-    PGresult* res_;
-    const std::string graph_name_;
-
     
-public:
+    PGresult* res_;
+    struct Segment {
+        public:
+        std::string segmentkey;
+        std::string startpoint;
+        std::string endpoint;
+        std::string category;
+        std::string direction;
+        std::string name;
+        std::string point;
+        std::vector<std::string> municipality_keys;
+    };
+    
+    public:
+    PGconn* conn_;
+    const std::string graph_name_;
     DBfunctions(const std::string& host,
                 const std::string& port,
                 const std::string& dbname,
@@ -41,6 +52,13 @@ public:
                 const std::string& password,
                 const std::string& graph_prefix,
                 const std::string& graph_name);
+
     bool ResetGraph();
     bool CreateMunicipalities();
+    bool CreateNodesForAllSubMunicipalities();
+    bool CreateEdgesForAllSegments();
+    bool CreateNodesForAllStartAndEndpoints();
+    bool CreateEdgesForAllIntersections();
+    std::string escape_quotes(std::string s);
+    bool BenchmarkQuery(std::string benchmark_name, const std::string query);
 };
