@@ -25,6 +25,8 @@ int main() {
     db.CreateMunicipalities();
     db.CreateNodesForAllSubMunicipalities();
     db.CreateEdgesForAllSegments();
+    db.CreateTrajectories();
+    db.CreateEdgesForTrajectoriesToSegments();
     */
 
 /*

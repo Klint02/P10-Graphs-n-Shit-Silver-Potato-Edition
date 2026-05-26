@@ -7,6 +7,7 @@
 #include <string>
 #include <iomanip>
 #include <chrono>
+#include <algorithm>
 
 
 //TODO(nkc): turn into struct that has a map of each column linked to each column
@@ -61,4 +62,20 @@ private:
     bool CreateEdgesForAllIntersections();
     std::string escape_quotes(std::string s);
     bool BenchmarkQuery(std::string benchmark_name, const std::string query);
+    bool CreateTrajectories();
+    bool CreateEdgesForTrajectoriesToSegments();
 };
+
+struct Trip_row {
+    int trip_id;
+    int segment_amount;
+    std::vector<int> segment_array;
+    double total_meters_driven;
+    std::string geo_trip;
+};
+
+std::vector<Trip_row> extract_Trip_Data_From_CSV(const std::string& filepath);
+
+bool insert_trips_as_nodes(PGconn* conn, const std::vector<Trip_row>& data);
+
+bool add_trip_edges(PGconn* conn, std::vector<std::vector<std::string>>& segment_data, const std::vector<Trip_row>& trip_data);
