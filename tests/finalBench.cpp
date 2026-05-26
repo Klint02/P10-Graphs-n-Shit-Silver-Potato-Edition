@@ -128,7 +128,7 @@ int main(){
      //SAN
       db.BenchmarkQuery(graph_SAN + "fetch_node_with_relations_in", std::format(
         "select * from cypher('{}', $$ "
-        "MATCH(A:segment {{segmentkey: '23781'}})<-[R]-(B:segment) "
+        "MATCH(A:segment {{segmentkey: '23781'}})-[R]->(B:segment) "
         "return B.segmentkey "
         "$$) as (Node1 agtype); "
         , db.graph_name_)
@@ -158,7 +158,25 @@ int main(){
 
     );
 
+    //SAN
+    db.BenchmarkQuery(graph_SAN + "fetch_node_with_relations_in", std::format(
+        "select * from cypher('{}', $$ "
+        "MATCH(A:segment {{segmentkey: '23781'}})-[R]-(B:segment) "
+        "return B.segmentkey "
+        "$$) as (Node1 agtype); "
+        , db.graph_name_)
 
+    );
+
+    //SAE
+    db1.BenchmarkQuery(graph_SAE + "fetch_node_with_relations_in", std::format(
+        "SELECT * FROM cypher('{}', $$ "
+        "MATCH (a:intersection {{point:24775}})-[r:segment]-(b) "
+        "RETURN r2.segmentkey  "
+        "$$) AS (segmentkey agtype); "
+        , db1.graph_name_)
+
+    );
 
     //----------------------------------Q6: node_degree-----------------------------------------
     //Postgis
@@ -193,14 +211,14 @@ int main(){
     "insert into experiments.shortcut values (1, 24774, 359481, 'dummy edge');"
     );
 
-    db.BenchmarkQuery(graph_SAN + "node_degree", std::format(
+    db.BenchmarkQuery(graph_SAN + "create_shortcut", std::format(
     "SELECT * FROM cypher('{}', $$ "
     "match (n {{segmentkey:'418703'}}),(b {{segmentkey: '418712'}})  "
-    "(n)-[r:shortcut]->(b) "
+    "CREATE (n)-[r:shortcut]->(b) "
     "$$ ) AS (segmentkey agtype); ", db.graph_name_)
     );
 
-    db1.BenchmarkQuery(graph_SAE + "node_degree", std::format(
+    db1.BenchmarkQuery(graph_SAE + "create_shortcut", std::format(
     "SELECT * FROM cypher('{}', $$ "
     "MATCH (n {{point:'24775'}}), (b: {{point:'399233'}}) "
     "create (n)-[r:shortcut]->(b) "
@@ -338,7 +356,7 @@ int main(){
         );
     
     //SAN
-    db.BenchmarkQuery(graph_SAN + "fetch_neighbourhood", std::format(
+    db.BenchmarkQuery(graph_SAN + "KNN", std::format(
             "SELECT * from cypher('{}', $$ "
             "MATCH (A:segment {{segmentkey: '617393'}})-[R*1..3]->(B) "
             "return B.segmentkey "
@@ -348,10 +366,10 @@ int main(){
         );
 
     //SAE
-    db1.BenchmarkQuery(graph_SAE + "fetch_neighbourhood", std::format(
+    db1.BenchmarkQuery(graph_SAE + "KNN", std::format(
             "SELECT * from cypher('{}', $$ "
-            "MATCH (A:intersection)-[R:segment*1..3]->(B) "
-            "return A, R, B "
+            "MATCH (A:intersection {point:24775})-[R:segment*1..3]->(B) "
+            "return B.segmentkey "
             "$$) as (segmentkey agtype); "
             , db1.graph_name_)
             
