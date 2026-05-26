@@ -226,57 +226,6 @@ bool DBfunctions::CreateNodesForAllSubMunicipalities()
     return true;
 }
 
-bool DBfunctions::CreateTrajectories() 
-{
-    auto start_timer{std::chrono::steady_clock::now()};
-    
-    //TODO(CLM): Find a faster way to include geo_trip. Current way (commented out) is 5 times slower due to inner join.
-    db_result_t trajectories = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trajectory_duration, ARRAY_AGG(seconds) as segment_duration "
-                                            "FROM mapmatched_data.viterbi_match_osm_dk_20140101 "
-                                            "GROUP BY trip_id");
-    // db_result_t trajectories = returnResult(conn_, "SELECT trip_id, count(trip_id) as segment_amount, ARRAY_AGG(trip.segmentkey) as segment_array, sum(meters_driven) as total_meters_driven, sum(seconds) as total_trajectory_duration, ARRAY_AGG(seconds) as segment_duration, ST_Union(segmentgeo::geometry) as geo_trajectory "
-    //                                         "FROM(SELECT trip_id, segmentkey, meters_driven, seconds "
-    //                                         "FROM mapmatched_data.viterbi_match_osm_dk_20140101) trip "
-    //                                         "INNER JOIN (SELECT segmentkey, segmentgeo "
-    //                                         "FROM maps.osm_dk_20140101) segmentmap "
-    //                                         "ON trip.segmentkey = segmentmap.segmentkey "
-    //                                         "GROUP BY trip_id");
-
-    std::cout << trajectories.size() << std::endl;
-
-    PQclear(PQexec(conn_, "BEGIN"));
-
-    auto count = 0;
-    for(auto trajectory : trajectories){
-        if(count%1000==0) std::cout << count << std::endl;
-        count++;
-
-        PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
-            "CREATE (:trajectory {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}'}}) "
-            "$$) as (n agtype)", graph_name_, trajectory.at(0), trajectory.at(1), trajectory.at(2), trajectory.at(3), trajectory.at(4)).c_str());
-        // PGresult* res = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ CREATE (:trajectory {{id: '{}', segment_amount: '{}', segment_array: '{}', total_meters_driven: '{}', total_duration: '{}', geotrip: '{}'}}) $$) as (n agtype)", graph_name_, trajectory.at(0), trajectory.at(1), trajectory.at(2), trajectory.at(3), trajectory.at(4), trajectory.at(6)).c_str());
-        
-        if(PQresultStatus(res) != PGRES_TUPLES_OK){
-            std::cerr << "CreateTrajectories() Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(res);
-            
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false; 
-        }
-        
-        PQclear(res);
-    }
-
-    PQclear(PQexec(conn_, "COMMIT"));
-
-    auto finish{std::chrono::steady_clock::now()};
-    std::chrono::duration<double> time_elapsed{finish-start_timer};
-
-    std::cout<< "It took CreateTrajectories() " << time_elapsed.count() <<" seconds to compute." << std::endl;
-        
-    return true;
-}
-
 bool DBfunctions::CreateEdgesForTrajectoriesToSegments() 
 {
     auto start_timer{std::chrono::steady_clock::now()};
