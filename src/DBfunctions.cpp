@@ -446,9 +446,9 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
         "WHERE id(t) = row.trajectory_vertex_id "
         "MATCH (su:sub_municipality {dk_municipalitykey: row.dk_municipalitykey})-[:contains]->(s:segment) "
         "WHERE id(s) = row.segment_vertex_id "
-        "CREATE (t)-[u:uses]->(s) "
-        "SET u.occurrance_array = row.occurrance_array "
-        "$$) as (n agtype);";
+        "CREATE (t)-[tc:trajectory_connection]->(s) "
+        "SET tc.occurrance_array = row.occurrance_array "
+        "$$) as (tc agtype);";
 
         std::cout << "Traject id's from " << b << " to " << b+BATCH_SIZE << std::endl;
         auto number_of_connections = 0;
@@ -528,7 +528,7 @@ bool DBfunctions::CreateEdgesForTrajectoriesToSegments()
     
         std::cout<< "It took query " << query_time_elapsed.count() <<" seconds to compute." << std::endl;
         query_time_sum+=query_time_elapsed.count();
-        std::cout << "Seconds since begun: " << query_time_sum << std::endl;
+        std::cout << "Query time total: " << query_time_sum << std::endl;
 
         PQclear(res);
     }
