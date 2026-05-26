@@ -274,18 +274,6 @@ bool DBfunctions::CreateEdgesForAllSegments(){
         std::chrono::duration<double> time_elapsed2{query2 - query1};
         std::cout << "BOTH->FORWARD took: " << time_elapsed2.count() << " seconds" << std::endl;
 
-        if(PQresultStatus(resBF) != PGRES_TUPLES_OK){
-            std::cerr << "Query for BOTH->FORWARD Failed to execute " <<PQerrorMessage(conn_)<< std::endl;
-            PQclear(resBF);
-
-            PQclear(PQexec(conn_, "ROLLBACK"));
-            return false;
-        }
-
-        auto query2{std::chrono::steady_clock::now()};
-        std::chrono::duration<double> time_elapsed2{query2 - query1};
-        std::cout << "BOTH->FORWARD took: " << time_elapsed2.count() << " seconds" << std::endl;
-
         PGresult* resFB = PQexec(conn_, std::format("SELECT * FROM cypher('{}', $$ "
         "MATCH (su:sub_municipality {{dk_municipalitykey: {}}})-[:contains]->(a:segment {{direction: 'FORWARD'}}), (su:sub_municipality {{dk_municipalitykey: {}}})-[:contains]->(b:segment {{direction: 'BOTH'}}) "
         "WHERE a.endpoint = b.startpoint or a.endpoint = b.endpoint "
