@@ -837,14 +837,20 @@ bool DBfunctions::CreateTrajectoryConnectionForSAE()
         
         auto start_query_time{std::chrono::steady_clock::now()};
         
+        PQclear(PQexec(conn_, "BEGIN"));
         PGresult* res = PQexec(conn_, query.c_str());    
+
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
             std::cerr << "CreateTrajectoryConnectionForSAE() failed: " << PQerrorMessage(conn_) << std::endl;
             PQclear(res);
+            PQclear(PQexec(conn_, "ROLLBACK"));
+          
             return false;
         }
-        PQclear(res);
         
+        PQclear(res);
+        PQclear(PQexec(conn_, "COMMIT"));
+
         auto finish_query_time{std::chrono::steady_clock::now()};
         std::chrono::duration<double> query_time_elapsed{finish_query_time-start_query_time};
     
