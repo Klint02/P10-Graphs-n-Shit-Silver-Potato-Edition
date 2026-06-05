@@ -8,7 +8,7 @@
 // select * from cypher('dummy_graph',$$ match(n)-[r]->(m) return n,r,m limit 100 $$) as (n agtype, r agtype, m agtype);
 // select * from cypher('dummy_graph',$$ match(n) detach delete n $$) as (n agtype); -> deletes all data in the graph.
 int main() {
-    /*
+    
     YAML::Node config = YAML::LoadFile(".info.yaml");
     
     const std::string host = config["server"].as<std::string>();
@@ -17,20 +17,33 @@ int main() {
     const std::string username = config["database-user"].as<std::string>();
     const std::string password = config["password"].as<std::string>();
     const std::string graph_prefix = config["graph_prefix"].as<std::string>();
-    const std::string graph_name = graph_prefix + "segment_as_edges_graph";
+    const std::string graph_name = graph_prefix + "segment_as_nodes_graph";
 
     DBfunctions db = DBfunctions(host, port, dbname, username, password, graph_prefix, graph_name);
     
-    // db.ResetGraph();
-    // db.CreateMunicipalities();
-    // db.CreateNodesForAllSubMunicipalities();
-    // db.CreateEdgesForAllSegments();
+    auto start_timer2{std::chrono::steady_clock::now()};
+    
+    //Always needed
+    //db.ResetGraph();
+    //db.CreateMunicipalities();
+    
+    //Only for SAE
     // db.CreateNodesForAllStartAndEndpoints();
     // db.CreateEdgesForAllIntersections();
-    // db.CreateTrajectories();
-    db.CreateTrajectoryConnectionForSAE();
-    */
+    // db.CreateTrajectoryConnectionForSAE();
 
+    // auto query1{std::chrono::steady_clock::now()};
+    // std::chrono::duration<double> time_elapsed1{query1 - start_timer2};
+    // std::cout << "Making SAE graph took: " << time_elapsed1.count() << " seconds" << std::endl;
+    
+    //Only for SAN
+    //db.CreateNodesForAllSubMunicipalities();
+    db.CreateEdgesForAllSegments();
+    db.CreateTrajectories();
+
+    auto query1{std::chrono::steady_clock::now()};
+    std::chrono::duration<double> time_elapsed1{query1 - start_timer2};
+    std::cout << "Making SAN graph took: " << time_elapsed1.count() << " seconds" << std::endl;
 /*
     std::vector<std::vector<std::string>> data = extract_Data_From_CSV("/home/rasmusbertelsennoerfjand/Documents/Aalborg universitet/10. Semester/DATA/Alle_segmenter_i_Aalborg_kommune.csv");
     
